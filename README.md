@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Gold Coast Kenkey POS
 
 A lightweight, touch-friendly Point of Sale system for Gold Coast Kenkey, a food joint in Ghana.
