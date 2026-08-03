@@ -1,0 +1,12 @@
+# Gold Coast Kenkey POS code owner
+# Replace @dyesaysit if a different GitHub account should approve pull requests.
+
+* @dyesaysit
+
+# Documentation
+/docs/ @dyesaysit
+AGENTS.md @dyesaysit
+README.md @dyesaysit
+
+# Repository workflow files
+/.github/ @dyesaysit
