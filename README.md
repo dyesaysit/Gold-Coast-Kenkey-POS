@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Gold Coast Kenkey POS
 
 A lightweight, touch-friendly Point of Sale system for Gold Coast Kenkey, a food joint in Ghana.
@@ -195,3 +196,4 @@ Do not merge code that the group cannot explain during the presentation.
 ## License
 
 This repository is for a school project. The team should decide later whether to add an open-source license.
+
