@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gold Coast Kenkey POS</title>
+
+  <!-- Design tokens first, then base layout, then responsive breakpoints. -->
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/responsive.css" />
+  <!-- Member 3 (feature/inventory-reports): styles for the Manager overlay. -->
+  <link rel="stylesheet" href="css/inventory-reports.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="app-header">
+      <h1 class="app-header__title" id="business-name">Gold Coast Kenkey</h1>
+      <div class="app-header__right">
+        <p class="app-header__tagline">Point of Sale</p>
+        <!-- Member 3: opens the inventory + daily report overlay. -->
+        <button class="btn btn--secondary" id="manager-button" type="button">Manager</button>
+      </div>
+    </header>
+
+    <!-- Category bar (filters the product grid) -->
+    <nav class="category-bar" id="category-bar" aria-label="Product categories">
+      <!-- Category chips are rendered by app.js -->
+    </nav>
+
+    <!-- Main area: product tiles + cart -->
+    <main class="app-main">
+      <section class="product-area" aria-label="Products">
+        <h2 class="section-title" id="product-area-title">Products</h2>
+        <div class="product-grid" id="product-grid">
+          <!-- Product tiles are rendered by app.js -->
+        </div>
+      </section>
+
+      <!-- Cart -->
+      <aside class="cart" id="cart" aria-label="Cart">
+        <h2 class="cart__title">Cart</h2>
+        <ul class="cart__items" id="cart-items">
+          <!-- Cart lines are rendered by app.js -->
+        </ul>
+        <p class="cart__empty" id="cart-empty">Your cart is empty.</p>
+
+        <div class="cart__summary">
+          <div class="cart__summary-row">
+            <span>Subtotal</span>
+            <span id="cart-subtotal">GH₵0.00</span>
+          </div>
+          <div class="cart__summary-row cart__summary-row--total">
+            <span>Total</span>
+            <span id="cart-total">GH₵0.00</span>
+          </div>
+          <!-- Checkout is a later feature; the button is present but disabled. -->
+          <button class="btn btn--accent" id="checkout-button" type="button" disabled>
+            Checkout (coming soon)
+          </button>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- Lightweight feedback message, controlled by app.js. -->
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <!--
+    Manager overlay (Member 3, feature/inventory-reports): inventory view and
+    daily report. Hidden until the Manager button is pressed. The empty
+    containers below are filled by manager-view.js, the same pattern app.js uses
+    for the product grid and cart.
+  -->
+  <div class="manager" id="manager-overlay" role="dialog" aria-modal="true" aria-labelledby="manager-title" hidden>
+    <div class="manager__panel">
+      <header class="manager__header">
+        <h2 class="manager__title" id="manager-title">Manager</h2>
+        <button class="btn btn--secondary" id="manager-close" type="button">Close</button>
+      </header>
+
+      <nav class="manager__tabs" aria-label="Manager sections">
+        <button class="manager__tab manager__tab--active" id="tab-inventory" type="button" aria-selected="true">Inventory</button>
+        <button class="manager__tab" id="tab-report" type="button" aria-selected="false">Today's report</button>
+      </nav>
+
+      <section class="manager__section" id="section-inventory" aria-label="Inventory">
+        <div class="inv-table-wrap">
+          <table class="inv-table">
+            <thead>
+              <tr>
+                <th scope="col">Product</th>
+                <th scope="col">Price</th>
+                <th scope="col">Stock</th>
+                <th scope="col">Low level</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody id="inventory-tbody"><!-- rows rendered by manager-view.js --></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="manager__section" id="section-report" aria-label="Today's report" hidden>
+        <div id="report-body"><!-- report rendered by manager-view.js --></div>
+      </section>
+    </div>
+  </div>
+
+  <!--
+    Scripts load as plain files (no bundler, no modules) so the page also works
+    when opened directly from the file system. Order matters: utilities and data
+    load before the services and the UI that use them.
+  -->
+  <script src="js/utils/money.js"></script>
+  <script src="js/utils/pricing.js"></script>
+  <script src="js/utils/validation.js"></script>
+  <script src="js/data/seed-data.js"></script>
+  <script src="js/services/storage-service.js"></script>
+  <!-- Member 3 (feature/inventory-reports): logic services, then the UI. -->
+  <script src="js/services/inventory-service.js"></script>
+  <script src="js/services/reports-service.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/ui/manager-view.js"></script>
+</body>
+</html>
