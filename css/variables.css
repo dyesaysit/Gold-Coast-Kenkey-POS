@@ -1,0 +1,48 @@
+/*
+ * variables.css
+ * Design tokens for the whole application (UI-GUIDELINES.md section 3).
+ * Colours, spacing, radius, and font sizes live here only. No screen should
+ * hard-code its own colours (AGENTS.md UI rule 2).
+ */
+:root {
+  /* Approved colour palette */
+  --color-primary-dark: #14532d;
+  --color-primary: #15803d;
+  --color-accent: #d4a017;
+  --color-background: #fff8e7;
+  --color-surface: #ffffff;
+  --color-text: #1f2937;
+  --color-text-muted: #6b7280;
+  --color-border: #e5e7eb;
+  --color-danger: #dc2626;
+  --color-warning: #d97706;
+  --color-success: #16a34a;
+
+  /* Typography */
+  --font-family: Arial, Helvetica, sans-serif;
+  --font-page-title: 28px;
+  --font-section-title: 22px;
+  --font-tile-title: 18px;
+  --font-price: 20px;
+  --font-body: 15px;
+  --font-small: 13px;
+  --font-button: 16px;
+
+  /* One spacing scale (UI-GUIDELINES.md section 19) */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* Shape */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* Minimum touch target (UI-GUIDELINES.md section 8) */
+  --touch-target: 44px;
+
+  --shadow-tile: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-panel: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
