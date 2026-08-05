@@ -1,0 +1,44 @@
+/*
+ * responsive.css
+ * Tablet and desktop adjustments (UI-GUIDELINES.md section 18).
+ * Mobile-first base lives in main.css; these breakpoints only add columns and
+ * larger tiles. Two breakpoints only, to avoid unnecessary complexity.
+ */
+
+/* --- Tablet: 640px and up ------------------------------------------------ */
+@media (min-width: 640px) {
+  .product-grid {
+    grid-template-columns: repeat(3, 1fr); /* three tiles per row */
+  }
+
+  .product-tile__image {
+    height: 130px;
+  }
+}
+
+/* --- Desktop: 1024px and up --------------------------------------------- */
+@media (min-width: 1024px) {
+  /* Products on the left, cart kept visible on the right. */
+  .app-main {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--space-lg);
+    padding: var(--space-lg);
+  }
+
+  .product-area {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .product-grid {
+    grid-template-columns: repeat(4, 1fr); /* four tiles per row */
+  }
+
+  /* Cart becomes a fixed-width side panel that stays on screen while scrolling. */
+  .cart {
+    flex: 0 0 340px;
+    position: sticky;
+    top: var(--space-lg);
+  }
+}
