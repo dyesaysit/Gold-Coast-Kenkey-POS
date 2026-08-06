@@ -24,6 +24,18 @@
     return isFinite(number) && number >= 0;
   }
 
+  /**
+   * A non-negative whole number (0 allowed). Used for stock quantity and
+   * low-stock level so stock can never be negative.
+   */
+  function isNonNegativeInteger(value) {
+    if (value === null || value === undefined || value === "") {
+      return false;
+    }
+    var number = Number(value);
+    return isFinite(number) && number >= 0 && Math.floor(number) === number;
+  }
+
   /** Amount paid must be a finite, non-negative number. */
   function isValidAmountPaid(value) {
     if (value === null || value === undefined || value === "") {
@@ -78,6 +90,7 @@
   global.GCK.validation = {
     isPositiveInteger: isPositiveInteger,
     isValidPrice: isValidPrice,
+    isNonNegativeInteger: isNonNegativeInteger,
     isValidAmountPaid: isValidAmountPaid,
     isCartEmpty: isCartEmpty,
     validateCheckout: validateCheckout,

@@ -73,6 +73,30 @@
   function getInventoryProducts() { return readJson(KEYS.inventoryProducts, []); }
   function saveInventoryProducts(products) { return writeJson(KEYS.inventoryProducts, products); }
 
+  // --- Combined product access (management screen) -------------------------
+  // The catalogue is split across two arrays: configured meals live in
+  // menuItems, simple products in inventoryProducts. The management screen
+  // treats them as one list. saveProduct routes a product to the correct array
+  // by productType and removes any stale copy, so a product that changes type
+  // is never duplicated.
+
+  function getProducts() {
+    return getMenuItems().concat(getInventoryProducts());
+  }
+
+  function saveProduct(product) {
+    var meals = getMenuItems().filter(function (m) { return m.id !== product.id; });
+    var simple = getInventoryProducts().filter(function (p) { return p.id !== product.id; });
+    if (product.productType === "configured-meal") {
+      meals.push(product);
+    } else {
+      simple.push(product);
+    }
+    var okMeals = saveMenuItems(meals);
+    var okSimple = saveInventoryProducts(simple);
+    return okMeals && okSimple;
+  }
+
   function getCashiers() { return readJson(KEYS.cashiers, []); }
   function saveCashiers(cashiers) { return writeJson(KEYS.cashiers, cashiers); }
 
@@ -152,6 +176,8 @@
     saveExtras: saveExtras,
     getInventoryProducts: getInventoryProducts,
     saveInventoryProducts: saveInventoryProducts,
+    getProducts: getProducts,
+    saveProduct: saveProduct,
     getCashiers: getCashiers,
     saveCashiers: saveCashiers,
     getSettings: getSettings,

@@ -74,7 +74,7 @@
     </nav>
 
     <!-- Main area: product tiles + cart -->
-    <main class="app-main">
+    <main class="app-main" id="app-main">
       <section class="product-area" aria-label="Products">
         <h2 class="section-title" id="product-area-title">Products</h2>
         <div class="product-grid" id="product-grid">
@@ -106,6 +106,18 @@
         </div>
       </aside>
     </main>
+
+    <!-- Product & inventory management (Supervisor/Admin). Hidden by default;
+         shown when the Products or Inventory section is selected. -->
+    <section class="manage" id="manage-view" hidden
+             aria-label="Product and inventory management">
+      <div class="manage__bar">
+        <h2 class="section-title" id="manage-title">Products</h2>
+        <button class="btn btn--primary" id="manage-add" type="button">Add product</button>
+      </div>
+      <p class="manage__hint" id="manage-hint"></p>
+      <div class="manage__list" id="manage-list"></div>
+    </section>
   </div>
 
   <!--
@@ -155,6 +167,94 @@
         <div class="modal__actions">
           <button class="btn btn--secondary" id="modal-cancel" type="button">Cancel</button>
           <button class="btn btn--primary" id="modal-add" type="button">Add to Cart</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Product form modal (add / edit a product). All fields filled by app.js. -->
+  <div class="modal" id="product-modal" hidden role="dialog" aria-modal="true"
+       aria-labelledby="product-modal-title">
+    <div class="modal__overlay" id="product-overlay"></div>
+    <div class="modal__panel" role="document">
+      <header class="modal__header">
+        <h2 class="modal__title" id="product-modal-title">Add product</h2>
+        <button class="modal__close" id="product-close" type="button" aria-label="Close">&#10005;</button>
+      </header>
+
+      <form class="modal__body product-form" id="product-form" novalidate>
+        <label class="field">
+          <span class="field__label">Product name</span>
+          <input class="field__input" id="pf-name" type="text" autocomplete="off" />
+        </label>
+
+        <label class="field">
+          <span class="field__label">Category</span>
+          <select class="field__input" id="pf-category"></select>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Product type</span>
+          <select class="field__input" id="pf-type">
+            <option value="simple">Simple product</option>
+            <option value="configured-meal">Configured meal</option>
+          </select>
+        </label>
+
+        <p class="field__note" id="pf-meal-note" hidden>
+          Configured meals are priced by their portions and are never
+          inventory-tracked. Portions are managed separately.
+        </p>
+
+        <label class="field" id="pf-price-field">
+          <span class="field__label">Selling price (GH₵)</span>
+          <input class="field__input" id="pf-price" type="number" min="0" step="0.01"
+                 inputmode="decimal" />
+        </label>
+
+        <label class="field field--check" id="pf-track-field">
+          <input id="pf-track" type="checkbox" />
+          <span class="field__label">Track inventory (stock)</span>
+        </label>
+
+        <label class="field" id="pf-stock-field" hidden>
+          <span class="field__label">Stock quantity</span>
+          <input class="field__input" id="pf-stock" type="number" min="0" step="1"
+                 inputmode="numeric" />
+        </label>
+
+        <label class="field" id="pf-low-field" hidden>
+          <span class="field__label">Low-stock level</span>
+          <input class="field__input" id="pf-low" type="number" min="0" step="1"
+                 inputmode="numeric" />
+        </label>
+
+        <label class="field field--check">
+          <input id="pf-active" type="checkbox" checked />
+          <span class="field__label">Active (visible for sale)</span>
+        </label>
+
+        <div class="field">
+          <span class="field__label">Product image</span>
+          <div class="image-picker">
+            <div class="image-picker__preview" id="pf-preview">
+              <span class="image-picker__empty">No image</span>
+            </div>
+            <div class="image-picker__actions">
+              <input id="pf-file" type="file" accept="image/*" class="visually-hidden" />
+              <button class="btn btn--secondary" id="pf-choose" type="button">Choose image</button>
+              <button class="btn btn--secondary" id="pf-remove" type="button" hidden>Remove image</button>
+            </div>
+            <p class="field__note">JPG, PNG, WebP or GIF, up to 5 MB. Images are compressed automatically.</p>
+          </div>
+        </div>
+      </form>
+
+      <footer class="modal__footer">
+        <p class="modal__error" id="pf-error" role="alert"></p>
+        <div class="modal__actions">
+          <button class="btn btn--secondary" id="pf-cancel" type="button">Cancel</button>
+          <button class="btn btn--primary" id="pf-save" type="button">Save product</button>
         </div>
       </footer>
     </div>

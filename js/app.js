@@ -88,6 +88,42 @@
     elements.modalError = document.getElementById("modal-error");
     elements.modalCancel = document.getElementById("modal-cancel");
     elements.modalAdd = document.getElementById("modal-add");
+
+    // POS main area (toggled against the management screen)
+    elements.appMain = document.getElementById("app-main");
+
+    // Product & inventory management screen
+    elements.manageView = document.getElementById("manage-view");
+    elements.manageTitle = document.getElementById("manage-title");
+    elements.manageAdd = document.getElementById("manage-add");
+    elements.manageHint = document.getElementById("manage-hint");
+    elements.manageList = document.getElementById("manage-list");
+
+    // Product form modal
+    elements.productModal = document.getElementById("product-modal");
+    elements.productOverlay = document.getElementById("product-overlay");
+    elements.productClose = document.getElementById("product-close");
+    elements.productModalTitle = document.getElementById("product-modal-title");
+    elements.pfName = document.getElementById("pf-name");
+    elements.pfCategory = document.getElementById("pf-category");
+    elements.pfType = document.getElementById("pf-type");
+    elements.pfMealNote = document.getElementById("pf-meal-note");
+    elements.pfPriceField = document.getElementById("pf-price-field");
+    elements.pfPrice = document.getElementById("pf-price");
+    elements.pfTrackField = document.getElementById("pf-track-field");
+    elements.pfTrack = document.getElementById("pf-track");
+    elements.pfStockField = document.getElementById("pf-stock-field");
+    elements.pfStock = document.getElementById("pf-stock");
+    elements.pfLowField = document.getElementById("pf-low-field");
+    elements.pfLow = document.getElementById("pf-low");
+    elements.pfActive = document.getElementById("pf-active");
+    elements.pfPreview = document.getElementById("pf-preview");
+    elements.pfFile = document.getElementById("pf-file");
+    elements.pfChoose = document.getElementById("pf-choose");
+    elements.pfRemove = document.getElementById("pf-remove");
+    elements.pfError = document.getElementById("pf-error");
+    elements.pfCancel = document.getElementById("pf-cancel");
+    elements.pfSave = document.getElementById("pf-save");
   }
 
   /** Show a short, clear message (UI-GUIDELINES.md section 16). */
@@ -265,15 +301,31 @@
   function showPos() {
     elements.loginView.hidden = true;
     elements.posView.hidden = false;
-    activeNavKey = defaultNavKeyFor(currentUser);
     renderUserArea();
-    renderNav();
+    showSection(defaultNavKeyFor(currentUser));
   }
 
   /** The section a role lands on: its first accessible nav item. */
   function defaultNavKeyFor(user) {
     var nav = user ? auth.getAccessibleNav(user.role) : [];
     return nav.length ? nav[0].key : "pos";
+  }
+
+  /**
+   * Switch the visible section. POS shows the sales grid + cart; Products and
+   * Inventory show the management screen. Other sections are not built yet.
+   */
+  function showSection(key) {
+    activeNavKey = key;
+    var isPos = (key === "pos");
+    var isManage = (key === "products" || key === "inventory");
+    elements.categoryBar.hidden = !isPos;
+    elements.appMain.hidden = !isPos;
+    elements.manageView.hidden = !isManage;
+    if (isManage) {
+      renderManageScreen(key);
+    }
+    renderNav();
   }
 
   function showLogin() {
@@ -324,13 +376,21 @@
   }
 
   function handleNavClick(item) {
-    // The product grid is the content for both the POS and Products sections.
-    if (item.key === "pos" || item.key === "products") {
-      activeNavKey = item.key;
-      renderNav();
+    if (item.key === "pos") {
+      showSection("pos");
       return;
     }
-    // Other sections are accessible per role but not built yet.
+    if (item.key === "products" || item.key === "inventory") {
+      // Nav is already role-filtered; this guard is defence in depth.
+      if (currentUser && auth.canAccess(currentUser.role, item.key)) {
+        showSection(item.key);
+      } else {
+        showToast("You do not have access to " + item.label + ".");
+      }
+      return;
+    }
+    // Sales History, Reports, Users and Settings are accessible per role but
+    // not built yet.
     showToast(item.label + " is coming in a later feature.");
   }
 
@@ -1110,6 +1170,379 @@
     return meta;
   }
 
+  // --- Product & inventory management -------------------------------------
+  // Access is enforced by nav filtering (Products/Inventory only appear for
+  // supervisor + admin) and re-checked below. Cashiers can never reach these.
+
+  var editingProductId = null;
+  var formImage = ""; // current image (data URI or path); "" means none
+
+  function bindManageEvents() {
+    elements.manageAdd.addEventListener("click", function () {
+      openProductForm(null);
+    });
+    elements.pfType.addEventListener("change", updateFormVisibility);
+    elements.pfTrack.addEventListener("change", updateFormVisibility);
+    elements.pfChoose.addEventListener("click", function () {
+      elements.pfFile.click();
+    });
+    elements.pfFile.addEventListener("change", function (event) {
+      var file = event.target.files && event.target.files[0];
+      handleImageFile(file);
+      event.target.value = ""; // allow re-picking the same file
+    });
+    elements.pfRemove.addEventListener("click", function () {
+      setFormImage("");
+    });
+    elements.pfSave.addEventListener("click", saveProductForm);
+    elements.pfCancel.addEventListener("click", closeProductForm);
+    elements.productClose.addEventListener("click", closeProductForm);
+    elements.productOverlay.addEventListener("click", closeProductForm);
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !elements.productModal.hidden) {
+        closeProductForm();
+      }
+    });
+  }
+
+  function canManage() {
+    return !!currentUser &&
+      (auth.canAccess(currentUser.role, "products") ||
+       auth.canAccess(currentUser.role, "inventory"));
+  }
+
+  function renderManageScreen(key) {
+    var isInventory = (key === "inventory");
+    elements.manageTitle.textContent = isInventory ? "Inventory & Stock" : "Products";
+    elements.manageAdd.hidden = isInventory; // the stock view does not add products
+    elements.manageHint.textContent = isInventory
+      ? "Update stock for inventory-tracked products."
+      : "Add or edit products. Configured meals are priced by their portions.";
+    renderManageList(key);
+  }
+
+  function renderManageList(key) {
+    elements.manageList.innerHTML = "";
+    var products = storage.getProducts();
+    if (key === "inventory") {
+      products = products.filter(function (p) { return tracksInventory(p); });
+    }
+    if (products.length === 0) {
+      var empty = document.createElement("p");
+      empty.className = "cart__empty";
+      empty.textContent = "No products to show.";
+      elements.manageList.appendChild(empty);
+      return;
+    }
+    for (var i = 0; i < products.length; i++) {
+      elements.manageList.appendChild(buildManageRow(products[i], key));
+    }
+  }
+
+  function buildManageRow(product, key) {
+    var row = document.createElement("div");
+    row.className = "manage-row";
+
+    var thumb = document.createElement("div");
+    thumb.className = "manage-row__thumb";
+    if (product.image) {
+      var img = document.createElement("img");
+      img.src = product.image;
+      img.alt = product.name;
+      img.addEventListener("error", function () { thumb.textContent = "🍽️"; });
+      thumb.appendChild(img);
+    } else {
+      thumb.textContent = "🍽️";
+    }
+
+    var info = document.createElement("div");
+    info.className = "manage-row__info";
+    var name = document.createElement("div");
+    name.className = "manage-row__name";
+    name.textContent = product.name + (product.active === false ? " (inactive)" : "");
+    var meta = document.createElement("div");
+    meta.className = "manage-row__meta";
+    if (isConfiguredMeal(product)) {
+      meta.textContent = "Configured meal · priced by portions";
+    } else {
+      var text = "Simple · " + money.formatMoney(product.sellingPrice);
+      if (tracksInventory(product)) {
+        text += " · Stock: " + product.stockQuantity;
+      }
+      meta.textContent = text;
+    }
+    info.appendChild(name);
+    info.appendChild(meta);
+
+    var edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "btn btn--secondary";
+    edit.textContent = (key === "inventory") ? "Update stock" : "Edit";
+    edit.addEventListener("click", function () { openProductForm(product); });
+
+    row.appendChild(thumb);
+    row.appendChild(info);
+    row.appendChild(edit);
+    return row;
+  }
+
+  function findProductById(id) {
+    var i;
+    for (i = 0; i < state.menuItems.length; i++) {
+      if (state.menuItems[i].id === id) { return state.menuItems[i]; }
+    }
+    for (i = 0; i < state.inventoryProducts.length; i++) {
+      if (state.inventoryProducts[i].id === id) { return state.inventoryProducts[i]; }
+    }
+    return null;
+  }
+
+  // --- Product form --------------------------------------------------------
+
+  function openProductForm(product) {
+    if (!canManage()) {
+      showToast("You do not have access to manage products.");
+      return;
+    }
+    editingProductId = product ? product.id : null;
+    populateCategoryOptions();
+    elements.productModalTitle.textContent = product ? "Edit product" : "Add product";
+    setFormError("");
+
+    if (product) {
+      elements.pfName.value = product.name || "";
+      elements.pfCategory.value = product.categoryId || "";
+      elements.pfType.value = isConfiguredMeal(product) ? "configured-meal" : "simple";
+      elements.pfType.disabled = true; // type is fixed on edit (protects portions)
+      elements.pfPrice.value = (typeof product.sellingPrice === "number") ? product.sellingPrice : "";
+      elements.pfTrack.checked = tracksInventory(product);
+      elements.pfStock.value = (product.stockQuantity == null) ? "" : product.stockQuantity;
+      elements.pfLow.value = (product.lowStockLevel == null) ? "" : product.lowStockLevel;
+      elements.pfActive.checked = product.active !== false;
+      setFormImage(product.image || "");
+    } else {
+      elements.pfName.value = "";
+      elements.pfCategory.selectedIndex = 0;
+      elements.pfType.value = "simple";
+      elements.pfType.disabled = false;
+      elements.pfPrice.value = "";
+      elements.pfTrack.checked = false;
+      elements.pfStock.value = "";
+      elements.pfLow.value = "";
+      elements.pfActive.checked = true;
+      setFormImage("");
+    }
+    updateFormVisibility();
+    elements.productModal.hidden = false;
+    elements.pfName.focus();
+  }
+
+  function closeProductForm() {
+    elements.productModal.hidden = true;
+    editingProductId = null;
+    formImage = "";
+  }
+
+  function populateCategoryOptions() {
+    elements.pfCategory.innerHTML = "";
+    var cats = state.categories.slice().sort(function (a, b) {
+      return a.displayOrder - b.displayOrder;
+    });
+    for (var i = 0; i < cats.length; i++) {
+      if (!cats[i].active) { continue; }
+      var option = document.createElement("option");
+      option.value = cats[i].id;
+      option.textContent = cats[i].name;
+      elements.pfCategory.appendChild(option);
+    }
+  }
+
+  /** Show/hide price and stock fields per product type + track toggle. */
+  function updateFormVisibility() {
+    var isMeal = elements.pfType.value === "configured-meal";
+    // Configured meals: no selling price here, never inventory-tracked.
+    elements.pfMealNote.hidden = !isMeal;
+    elements.pfPriceField.hidden = isMeal;
+    elements.pfTrackField.hidden = isMeal;
+    if (isMeal) {
+      elements.pfTrack.checked = false;
+    }
+    var showStock = !isMeal && elements.pfTrack.checked;
+    elements.pfStockField.hidden = !showStock;
+    elements.pfLowField.hidden = !showStock;
+  }
+
+  function setFormError(message) {
+    elements.pfError.textContent = message;
+  }
+
+  function saveProductForm() {
+    if (!canManage()) {
+      showToast("You do not have access to manage products.");
+      return;
+    }
+    var name = elements.pfName.value.trim();
+    if (!name) {
+      setFormError("Enter a product name.");
+      return;
+    }
+    var categoryId = elements.pfCategory.value;
+    if (!categoryId) {
+      setFormError("Choose a category.");
+      return;
+    }
+
+    var type = elements.pfType.value;
+    var isMeal = type === "configured-meal";
+    var existing = editingProductId ? findProductById(editingProductId) : null;
+
+    var product = {
+      id: editingProductId || createId(isMeal ? "meal" : "product"),
+      name: name,
+      categoryId: categoryId,
+      productType: type,
+      itemType: isMeal ? "configured-meal" : "inventory-product", // legacy compat
+      image: formImage,
+      active: elements.pfActive.checked
+    };
+
+    if (isMeal) {
+      // Meals: never inventory, priced by portions. Do not change pricing here.
+      product.trackInventory = false;
+      product.stockQuantity = null;
+      product.lowStockLevel = null;
+      product.portionIds = (existing && existing.portionIds) ? existing.portionIds : [];
+      product.allowedExtraIds = (existing && existing.allowedExtraIds) ? existing.allowedExtraIds : [];
+      if (existing && existing.description) { product.description = existing.description; }
+    } else {
+      if (!validation.isValidPrice(elements.pfPrice.value) || elements.pfPrice.value === "") {
+        setFormError("Enter a valid selling price (a number, 0 or more).");
+        return;
+      }
+      product.sellingPrice = money.roundMoney(Number(elements.pfPrice.value));
+
+      var track = elements.pfTrack.checked;
+      product.trackInventory = track;
+      if (track) {
+        if (!validation.isNonNegativeInteger(elements.pfStock.value)) {
+          setFormError("Enter a valid stock quantity (whole number, 0 or more).");
+          return;
+        }
+        if (!validation.isNonNegativeInteger(elements.pfLow.value)) {
+          setFormError("Enter a valid low-stock level (whole number, 0 or more).");
+          return;
+        }
+        product.stockQuantity = Number(elements.pfStock.value);
+        product.lowStockLevel = Number(elements.pfLow.value);
+      } else {
+        product.stockQuantity = null;
+        product.lowStockLevel = null;
+      }
+    }
+
+    storage.saveProduct(product);
+    reloadCatalogue();          // refresh in-memory data + POS grid
+    closeProductForm();
+    renderManageScreen(activeNavKey); // refresh the management list
+    showToast("Product saved.");
+  }
+
+  /** Re-read the catalogue from storage and refresh POS rendering. */
+  function reloadCatalogue() {
+    state.categories = storage.getCategories();
+    state.menuItems = storage.getMenuItems();
+    state.portions = storage.getPortions();
+    state.inventoryProducts = storage.getInventoryProducts();
+    state.extras = storage.getExtras();
+    renderCategories();
+    renderProducts();
+  }
+
+  // --- Image upload (validate, compress, preview) --------------------------
+
+  var MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+  var ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+  function setFormImage(value) {
+    formImage = value || "";
+    elements.pfPreview.innerHTML = "";
+    if (formImage) {
+      var img = document.createElement("img");
+      img.src = formImage;
+      img.alt = "Product image preview";
+      elements.pfPreview.appendChild(img);
+      elements.pfChoose.textContent = "Replace image";
+      elements.pfRemove.hidden = false;
+    } else {
+      var span = document.createElement("span");
+      span.className = "image-picker__empty";
+      span.textContent = "No image";
+      elements.pfPreview.appendChild(span);
+      elements.pfChoose.textContent = "Choose image";
+      elements.pfRemove.hidden = true;
+    }
+  }
+
+  function handleImageFile(file) {
+    if (!file) {
+      return;
+    }
+    if (ALLOWED_IMAGE_TYPES.indexOf(file.type) === -1) {
+      setFormError("Unsupported image type. Use JPG, PNG, WebP or GIF.");
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setFormError("Image is too large. Maximum size is 5 MB.");
+      return;
+    }
+    setFormError("");
+    compressImage(file, function (error, dataUrl) {
+      if (error) {
+        setFormError("Could not read that image. Please try another file.");
+        return;
+      }
+      setFormImage(dataUrl);
+    });
+  }
+
+  /**
+   * Compress an image by scaling it to at most 600px on its longest side and
+   * re-encoding as JPEG, so stored data URIs stay small.
+   */
+  function compressImage(file, callback) {
+    var reader = new FileReader();
+    reader.onload = function (event) {
+      var img = new Image();
+      img.onload = function () {
+        var maxDim = 600;
+        var w = img.width;
+        var h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w >= h) {
+            h = Math.round(h * (maxDim / w));
+            w = maxDim;
+          } else {
+            w = Math.round(w * (maxDim / h));
+            h = maxDim;
+          }
+        }
+        var canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        try {
+          callback(null, canvas.toDataURL("image/jpeg", 0.7));
+        } catch (ex) {
+          callback(ex);
+        }
+      };
+      img.onerror = function () { callback(new Error("decode failed")); };
+      img.src = event.target.result;
+    };
+    reader.onerror = function () { callback(new Error("read failed")); };
+    reader.readAsDataURL(file);
+  }
+
   // --- Startup -------------------------------------------------------------
 
   function init() {
@@ -1119,6 +1552,7 @@
     applyBranding();
     bindAuthEvents();
     bindModalEvents();
+    bindManageEvents();
 
     // POS content can be rendered while hidden; it is revealed after login.
     renderCategories();
