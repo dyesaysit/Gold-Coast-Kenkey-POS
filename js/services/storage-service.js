@@ -19,7 +19,8 @@
     sales: "gckpos.sales",
     cashiers: "gckpos.cashiers",
     settings: "gckpos.settings",
-    currentCart: "gckpos.currentCart"
+    currentCart: "gckpos.currentCart",
+    session: "gckpos.session"
   };
 
   /**
@@ -95,6 +96,22 @@
   function saveCurrentCart(cart) { return writeJson(KEYS.currentCart, cart); }
   function clearCurrentCart() { return writeJson(KEYS.currentCart, []); }
 
+  // --- Active user session -------------------------------------------------
+  // Stores only the signed-in user snapshot (id, name, role) - never the PIN.
+
+  function getSession() { return readJson(KEYS.session, null); }
+  function saveSession(sessionUser) { return writeJson(KEYS.session, sessionUser); }
+
+  function clearSession() {
+    try {
+      localStorage.removeItem(KEYS.session);
+      return true;
+    } catch (error) {
+      console.error("Could not clear session.", error);
+      return false;
+    }
+  }
+
   // --- First-launch seeding -----------------------------------------------
 
   /**
@@ -144,6 +161,9 @@
     getCurrentCart: getCurrentCart,
     saveCurrentCart: saveCurrentCart,
     clearCurrentCart: clearCurrentCart,
+    getSession: getSession,
+    saveSession: saveSession,
+    clearSession: clearSession,
     seedInitialData: seedInitialData
   };
 })(window);

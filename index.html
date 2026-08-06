@@ -11,12 +11,58 @@
   <link rel="stylesheet" href="css/responsive.css" />
 </head>
 <body>
-  <div class="app">
-    <!-- Header -->
+  <!-- LOGIN VIEW: shown until a user signs in with a PIN. -->
+  <section class="login" id="login-view" aria-label="Sign in">
+    <div class="login__card">
+      <h1 class="login__business" id="login-business">Gold Coast Kenkey</h1>
+      <p class="login__prompt">Enter your PIN to sign in</p>
+
+      <!-- Masked PIN dots (filled as digits are entered). -->
+      <div class="pin-dots" id="pin-dots" role="status" aria-live="polite"
+           aria-label="PIN entry"></div>
+
+      <p class="login__error" id="login-error" role="alert"></p>
+
+      <!-- Large numeric PIN pad. app.js handles clicks via data-key / data-action. -->
+      <div class="pin-pad" id="pin-pad">
+        <button class="pin-key" type="button" data-key="1">1</button>
+        <button class="pin-key" type="button" data-key="2">2</button>
+        <button class="pin-key" type="button" data-key="3">3</button>
+        <button class="pin-key" type="button" data-key="4">4</button>
+        <button class="pin-key" type="button" data-key="5">5</button>
+        <button class="pin-key" type="button" data-key="6">6</button>
+        <button class="pin-key" type="button" data-key="7">7</button>
+        <button class="pin-key" type="button" data-key="8">8</button>
+        <button class="pin-key" type="button" data-key="9">9</button>
+        <button class="pin-key pin-key--action" type="button" data-action="clear">Clear</button>
+        <button class="pin-key" type="button" data-key="0">0</button>
+        <button class="pin-key pin-key--action" type="button" data-action="back"
+                aria-label="Backspace">&#9003;</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- POS VIEW: hidden until login succeeds. -->
+  <div class="app" id="pos-view" hidden>
+    <!-- Header: brand on the left, signed-in user + logout on the right. -->
     <header class="app-header">
-      <h1 class="app-header__title" id="business-name">Gold Coast Kenkey</h1>
-      <p class="app-header__tagline">Point of Sale</p>
+      <div class="app-header__brand">
+        <h1 class="app-header__title" id="business-name">Gold Coast Kenkey</h1>
+        <p class="app-header__tagline">Point of Sale</p>
+      </div>
+      <div class="app-header__user">
+        <div class="user-badge">
+          <span class="user-badge__name" id="user-name">&mdash;</span>
+          <span class="user-badge__role" id="user-role">&mdash;</span>
+        </div>
+        <button class="btn btn--secondary" id="logout-button" type="button">Log out</button>
+      </div>
     </header>
+
+    <!-- Role-based navigation. Items are rendered by app.js per access rules. -->
+    <nav class="app-nav" id="app-nav" aria-label="Main navigation">
+      <!-- Nav items are rendered by app.js -->
+    </nav>
 
     <!-- Category bar (filters the product grid) -->
     <nav class="category-bar" id="category-bar" aria-label="Product categories">
@@ -58,6 +104,58 @@
     </main>
   </div>
 
+  <!--
+    Meal configuration modal. Reusable for any configured meal; all content is
+    filled in by app.js from seed data. Hidden until a meal tile is clicked.
+  -->
+  <div class="modal" id="meal-modal" hidden role="dialog" aria-modal="true"
+       aria-labelledby="modal-meal-name">
+    <div class="modal__overlay" id="modal-overlay"></div>
+    <div class="modal__panel" role="document">
+      <header class="modal__header">
+        <div class="modal__image" id="modal-image"></div>
+        <h2 class="modal__title" id="modal-meal-name">Meal</h2>
+        <button class="modal__close" id="modal-close" type="button" aria-label="Close">&#10005;</button>
+      </header>
+
+      <div class="modal__body">
+        <section class="modal__section">
+          <h3 class="modal__section-title">Choose a size / package</h3>
+          <div class="option-list" id="modal-portions" role="radiogroup"
+               aria-label="Portion or package"></div>
+        </section>
+
+        <section class="modal__section" id="modal-included-section" hidden>
+          <h3 class="modal__section-title">Included</h3>
+          <p class="modal__included" id="modal-included"></p>
+        </section>
+
+        <section class="modal__section" id="modal-protein-section" hidden>
+          <h3 class="modal__section-title">Choose a protein</h3>
+          <div class="option-list" id="modal-proteins" role="radiogroup"
+               aria-label="Protein"></div>
+        </section>
+
+        <section class="modal__section" id="modal-extras-section" hidden>
+          <h3 class="modal__section-title">Extras</h3>
+          <div class="extra-list" id="modal-extras"></div>
+        </section>
+      </div>
+
+      <footer class="modal__footer">
+        <div class="modal__total">
+          <span>Unit total</span>
+          <span id="modal-total">GH₵0.00</span>
+        </div>
+        <p class="modal__error" id="modal-error" role="alert"></p>
+        <div class="modal__actions">
+          <button class="btn btn--secondary" id="modal-cancel" type="button">Cancel</button>
+          <button class="btn btn--primary" id="modal-add" type="button">Add to Cart</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
   <!-- Lightweight feedback message, controlled by app.js. -->
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
@@ -71,6 +169,7 @@
   <script src="js/utils/validation.js"></script>
   <script src="js/data/seed-data.js"></script>
   <script src="js/services/storage-service.js"></script>
+  <script src="js/services/auth-service.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
