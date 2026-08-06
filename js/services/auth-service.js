@@ -17,18 +17,27 @@
   var MAX_PIN_LENGTH = 6;
   var MIN_PIN_LENGTH = 4;
 
-  // The full set of navigation items the app knows about at this stage.
+  // The full set of navigation sections the app knows about. Order here is the
+  // display order and also decides each role's landing section (first allowed).
   var NAV_ITEMS = [
     { key: "pos", label: "POS" },
+    { key: "products", label: "Products" },
+    { key: "inventory", label: "Inventory" },
     { key: "sales-history", label: "Sales History" },
     { key: "reports", label: "Reports" },
-    { key: "inventory", label: "Inventory" }
+    { key: "users", label: "Users" },
+    { key: "settings", label: "Settings" }
   ];
 
-  // Which nav item keys each role may access. Admin gets every item.
+  // Which sections each role may access:
+  //   - cashier:    POS only.
+  //   - supervisor: POS plus Products, Inventory, Sales History, Reports.
+  //   - admin:      every section, including Users and Settings.
+  // Landing section is the first accessible item in NAV_ITEMS order, so keeping
+  // "pos" first means the supervisor lands on POS after login.
   var ROLE_ACCESS = {
     cashier: ["pos"],
-    supervisor: ["pos", "sales-history", "reports"],
+    supervisor: ["pos", "products", "inventory", "sales-history", "reports"],
     admin: NAV_ITEMS.map(function (item) { return item.key; })
   };
 

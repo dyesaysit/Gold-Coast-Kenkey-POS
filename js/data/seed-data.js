@@ -48,12 +48,19 @@
   var DEFAULT_DRINK_LOW = 5;
 
   var SEED_DATA = {
+    // All branding lives in settings so the whole app (login, header, future
+    // receipts/screens) can render from one reusable source. Gold Coast Kenkey
+    // is only the default seed; change these values for another business.
     settings: {
       businessName: "Gold Coast Kenkey",
+      shortName: "GCK",
+      logo: "", // image path when available; a shortName wordmark is shown otherwise
+      phone: "0245638225 / 0594908945 / 0532430146", // TODO: confirm business vs delivery numbers
+      address: "", // TODO: not printed on the menu - owner to provide
       currencyCode: "GHS",
       currencySymbol: "GH₵",
       receiptPrefix: "GCK",
-      dataVersion: 1
+      dataVersion: 2
     },
 
     // Seeded users. PIN is simplified for a school project (DATABASE-DESIGN.md
@@ -368,6 +375,26 @@
       { id: "pineapple-juice", name: "Pineapple Juice", categoryId: "drinks", itemType: "inventory-product", image: "images/pineapple-juice.jpg", sellingPrice: 12, stockQuantity: 30, lowStockLevel: 5, active: true }
     ]
   };
+
+  // ---- Product type / inventory contract ---------------------------------
+  // Every product carries an explicit product type and an inventory contract so
+  // stock behaviour depends on `trackInventory` alone - never on category or
+  // product name. Applied here so the whole catalogue stays consistent and any
+  // product added to the arrays above inherits the correct, reusable contract.
+  //   - Configured meals: productType "configured-meal", never stock-tracked.
+  //   - Simple products (currently drinks): productType "simple", stock-tracked.
+  // The older `itemType` field is left in place for storage compatibility.
+  SEED_DATA.menuItems.forEach(function (meal) {
+    meal.productType = "configured-meal";
+    meal.trackInventory = false;
+    meal.stockQuantity = null;
+    meal.lowStockLevel = null;
+  });
+  SEED_DATA.inventoryProducts.forEach(function (product) {
+    product.productType = "simple";
+    product.trackInventory = true;
+    // stockQuantity and lowStockLevel are already defined per product above.
+  });
 
   global.GCK = global.GCK || {};
   global.GCK.seedData = SEED_DATA;
