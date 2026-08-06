@@ -14,6 +14,7 @@
   <!-- LOGIN VIEW: shown until a user signs in with a PIN. -->
   <section class="login" id="login-view" aria-label="Sign in">
     <div class="login__card">
+      <span class="brand-logo brand-logo--lg" id="login-logo" aria-hidden="true"></span>
       <h1 class="login__business" id="login-business">Gold Coast Kenkey</h1>
       <p class="login__prompt">Enter your PIN to sign in</p>
 
@@ -47,8 +48,11 @@
     <!-- Header: brand on the left, signed-in user + logout on the right. -->
     <header class="app-header">
       <div class="app-header__brand">
-        <h1 class="app-header__title" id="business-name">Gold Coast Kenkey</h1>
-        <p class="app-header__tagline">Point of Sale</p>
+        <span class="brand-logo" id="header-logo" aria-hidden="true"></span>
+        <div class="app-header__brand-text">
+          <h1 class="app-header__title" id="business-name">Gold Coast Kenkey</h1>
+          <p class="app-header__tagline">Point of Sale</p>
+        </div>
       </div>
       <div class="app-header__user">
         <div class="user-badge">

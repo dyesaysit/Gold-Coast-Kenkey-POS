@@ -49,10 +49,50 @@ body {
   flex-wrap: wrap; /* brand and user area wrap onto two rows on small screens */
 }
 
+.app-header__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
 .app-header__title {
   margin: 0;
   font-size: var(--font-page-title);
   font-weight: bold;
+}
+
+/* Reusable brand mark. Renders settings.logo when set, otherwise a wordmark
+   built from settings.shortName. Used in the header and on the login card. */
+.brand-logo {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background-color: var(--color-accent);
+  color: var(--color-primary-dark);
+  font-weight: bold;
+  font-size: var(--font-small);
+}
+
+.brand-logo:empty {
+  display: none; /* nothing to show if there is no logo and no short name */
+}
+
+.brand-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.brand-logo--lg {
+  width: 64px;
+  height: 64px;
+  font-size: var(--font-tile-title);
+  margin: 0 auto var(--space-sm);
 }
 
 .app-header__tagline {

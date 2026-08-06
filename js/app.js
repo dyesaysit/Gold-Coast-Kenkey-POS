@@ -48,6 +48,7 @@
   function getElements() {
     // Login view
     elements.loginView = document.getElementById("login-view");
+    elements.loginLogo = document.getElementById("login-logo");
     elements.loginBusiness = document.getElementById("login-business");
     elements.pinDots = document.getElementById("pin-dots");
     elements.pinPad = document.getElementById("pin-pad");
@@ -55,6 +56,7 @@
 
     // POS view
     elements.posView = document.getElementById("pos-view");
+    elements.headerLogo = document.getElementById("header-logo");
     elements.businessName = document.getElementById("business-name");
     elements.userName = document.getElementById("user-name");
     elements.userRole = document.getElementById("user-role");
@@ -121,10 +123,35 @@
     }
   }
 
-  function applyBusinessName() {
-    if (state.settings && state.settings.businessName) {
-      elements.businessName.textContent = state.settings.businessName;
-      elements.loginBusiness.textContent = state.settings.businessName;
+  /** Render the business name and logo (login + header) from settings only. */
+  function applyBranding() {
+    var settings = state.settings || {};
+    var name = settings.businessName || "";
+    elements.businessName.textContent = name;
+    elements.loginBusiness.textContent = name;
+    renderLogo(elements.headerLogo, settings);
+    renderLogo(elements.loginLogo, settings);
+  }
+
+  /**
+   * Fill a brand-logo slot from settings: the logo image when set, otherwise a
+   * short-name wordmark. Leaves the slot empty (hidden) if neither is available.
+   */
+  function renderLogo(element, settings) {
+    if (!element) {
+      return;
+    }
+    element.innerHTML = "";
+    if (settings.logo) {
+      var img = document.createElement("img");
+      img.src = settings.logo;
+      img.alt = (settings.businessName || "Business") + " logo";
+      img.addEventListener("error", function () {
+        element.textContent = settings.shortName || "";
+      });
+      element.appendChild(img);
+    } else {
+      element.textContent = settings.shortName || "";
     }
   }
 
@@ -238,8 +265,15 @@
   function showPos() {
     elements.loginView.hidden = true;
     elements.posView.hidden = false;
+    activeNavKey = defaultNavKeyFor(currentUser);
     renderUserArea();
     renderNav();
+  }
+
+  /** The section a role lands on: its first accessible nav item. */
+  function defaultNavKeyFor(user) {
+    var nav = user ? auth.getAccessibleNav(user.role) : [];
+    return nav.length ? nav[0].key : "pos";
   }
 
   function showLogin() {
@@ -290,10 +324,13 @@
   }
 
   function handleNavClick(item) {
-    if (item.key === "pos") {
-      return; // the POS screen is already visible
+    // The product grid is the content for both the POS and Products sections.
+    if (item.key === "pos" || item.key === "products") {
+      activeNavKey = item.key;
+      renderNav();
+      return;
     }
-    // These screens are accessible to the role but not built yet.
+    // Other sections are accessible per role but not built yet.
     showToast(item.label + " is coming in a later feature.");
   }
 
@@ -448,24 +485,26 @@
     body.appendChild(name);
     body.appendChild(price);
 
-    if (product.itemType === "configured-meal") {
+    if (isConfiguredMeal(product)) {
       var startingPrice = getStartingPrice(product.id);
       price.textContent = startingPrice === null
         ? "—"
         : "From " + money.formatMoney(startingPrice);
     } else {
-      // Inventory product: fixed price plus a stock line.
+      // Simple product: fixed price, plus a stock line only when tracked.
       price.textContent = money.formatMoney(product.sellingPrice);
 
-      var stock = document.createElement("span");
-      stock.className = "product-tile__stock";
-      if (product.stockQuantity <= product.lowStockLevel) {
-        stock.className += " product-tile__stock--low";
-        stock.textContent = "Low stock: " + product.stockQuantity + " left";
-      } else {
-        stock.textContent = "In stock: " + product.stockQuantity;
+      if (tracksInventory(product)) {
+        var stock = document.createElement("span");
+        stock.className = "product-tile__stock";
+        if (product.stockQuantity <= product.lowStockLevel) {
+          stock.className += " product-tile__stock--low";
+          stock.textContent = "Low stock: " + product.stockQuantity + " left";
+        } else {
+          stock.textContent = "In stock: " + product.stockQuantity;
+        }
+        body.appendChild(stock);
       }
-      body.appendChild(stock);
     }
 
     tile.appendChild(imageWrap);
@@ -479,11 +518,11 @@
   // --- Product interaction -------------------------------------------------
 
   function handleProductClick(product) {
-    if (product.itemType === "configured-meal") {
+    if (isConfiguredMeal(product)) {
       openMealModal(product);
       return;
     }
-    addInventoryProductToCart(product);
+    addSimpleProductToCart(product);
   }
 
   // --- Lookups -------------------------------------------------------------
@@ -516,6 +555,25 @@
       }
     }
     return list;
+  }
+
+  // --- Product contract helpers -------------------------------------------
+  // Read behaviour from the new productType / trackInventory fields, falling
+  // back to the legacy itemType so older stored data still works.
+
+  function isConfiguredMeal(product) {
+    if (product.productType) {
+      return product.productType === "configured-meal";
+    }
+    return product.itemType === "configured-meal";
+  }
+
+  /** Whether a product/cart line is inventory-tracked. Never uses category or name. */
+  function tracksInventory(entity) {
+    if (typeof entity.trackInventory === "boolean") {
+      return entity.trackInventory;
+    }
+    return entity.itemType === "inventory-product";
   }
 
   // --- Meal configuration modal -------------------------------------------
@@ -863,7 +921,7 @@
    * Add an inventory product to the cart. Identical products combine into one
    * line. Quantity can never exceed available stock (validation layer).
    */
-  function addInventoryProductToCart(product) {
+  function addSimpleProductToCart(product) {
     var existing = null;
     for (var i = 0; i < state.cart.length; i++) {
       if (state.cart[i].productId === product.id) {
@@ -873,10 +931,13 @@
     }
 
     var requested = existing ? existing.quantity + 1 : 1;
-    var stockCheck = validation.validateStockAvailable(product.stockQuantity, requested);
-    if (!stockCheck.valid) {
-      showToast(stockCheck.message);
-      return;
+    // Stock is enforced only when the product's inventory is tracked.
+    if (tracksInventory(product)) {
+      var stockCheck = validation.validateStockAvailable(product.stockQuantity, requested);
+      if (!stockCheck.valid) {
+        showToast(stockCheck.message);
+        return;
+      }
     }
 
     if (existing) {
@@ -890,6 +951,7 @@
         productName: product.name,
         image: product.image,
         unitPrice: product.sellingPrice,
+        trackInventory: tracksInventory(product),
         quantity: 1,
         lineTotal: pricing.calculateLineTotal(product.sellingPrice, 1)
       });
@@ -916,7 +978,7 @@
       removeCartItem(item.id);
       return;
     }
-    if (item.itemType === "inventory-product") {
+    if (tracksInventory(item)) {
       var product = findInventoryProduct(item.productId);
       if (product) {
         var check = validation.validateStockAvailable(product.stockQuantity, newQty);
@@ -966,7 +1028,7 @@
     var name = document.createElement("span");
     name.className = "cart-item__name";
     // Configured meals show the meal name plus the chosen portion/package.
-    name.textContent = (item.itemType === "configured-meal" && item.portion)
+    name.textContent = (isConfiguredMeal(item) && item.portion)
       ? item.productName + " — " + item.portion.name
       : item.productName;
 
@@ -979,7 +1041,7 @@
     li.appendChild(topRow);
 
     // Configuration details (protein, extras) for configured meals.
-    if (item.itemType === "configured-meal") {
+    if (isConfiguredMeal(item)) {
       if (item.protein) {
         li.appendChild(buildMetaLine("Protein: " + item.protein.name));
       }
@@ -1054,7 +1116,7 @@
     getElements();
     storage.seedInitialData(); // writes seed data only on first launch
     loadState();
-    applyBusinessName();
+    applyBranding();
     bindAuthEvents();
     bindModalEvents();
 
