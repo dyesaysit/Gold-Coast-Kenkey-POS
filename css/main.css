@@ -10,6 +10,12 @@
   box-sizing: border-box;
 }
 
+/* Hidden views/elements must always be removed from layout, even when the
+   element otherwise sets its own display (e.g. .app uses display:flex). */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
@@ -40,6 +46,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
+  flex-wrap: wrap; /* brand and user area wrap onto two rows on small screens */
 }
 
 .app-header__title {
@@ -52,6 +59,68 @@ body {
   margin: 0;
   font-size: var(--font-small);
   color: var(--color-accent);
+}
+
+/* Signed-in user area on the right of the header. */
+.app-header__user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.user-badge {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  text-align: right;
+}
+
+.user-badge__name {
+  font-weight: bold;
+}
+
+.user-badge__role {
+  font-size: var(--font-small);
+  color: var(--color-accent);
+  text-transform: capitalize;
+}
+
+/* --- Role-based navigation bar ------------------------------------------ */
+.app-nav {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  overflow-x: auto;
+  background-color: var(--color-primary);
+}
+
+.app-nav__item {
+  flex: 0 0 auto;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-md);
+  border: none;
+  border-radius: var(--radius-md);
+  background-color: transparent;
+  color: var(--color-surface);
+  font-size: var(--font-button);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.app-nav__item:hover {
+  background-color: var(--color-primary-dark);
+}
+
+.app-nav__item:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* The active screen is filled with the gold accent, not colour-only. */
+.app-nav__item--active {
+  background-color: var(--color-accent);
+  color: var(--color-text);
+  font-weight: bold;
 }
 
 /* --- Category bar -------------------------------------------------------- */
@@ -375,4 +444,401 @@ body {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* --- Cart quantity stepper (reduce/increase a line without removing) ----- */
+.cart-item__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.cart-item__stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.cart-item__step {
+  width: var(--touch-target);
+  height: var(--touch-target);
+  border: 2px solid var(--color-primary);
+  background-color: var(--color-surface);
+  color: var(--color-primary-dark);
+  border-radius: var(--radius-sm);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.cart-item__step:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.cart-item__qty {
+  min-width: 28px;
+  text-align: center;
+  font-weight: bold;
+  font-size: var(--font-price);
+}
+
+/* --- Meal configuration modal ------------------------------------------- */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-end; /* bottom sheet on mobile */
+  justify-content: center;
+}
+
+.modal__overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal__panel {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+}
+
+.modal__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.modal__image {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background-color: var(--color-background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.modal__image-placeholder {
+  font-size: 28px;
+}
+
+.modal__title {
+  flex: 1;
+  margin: 0;
+  font-size: var(--font-section-title);
+  color: var(--color-primary-dark);
+}
+
+.modal__close {
+  flex: 0 0 auto;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  border: none;
+  background-color: transparent;
+  color: var(--color-text-muted);
+  font-size: 20px;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+
+.modal__close:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.modal__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.modal__section-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-tile-title);
+  color: var(--color-primary-dark);
+}
+
+/* Portion / protein selection cards */
+.option-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.option-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-height: var(--touch-target);
+  padding: var(--space-md);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.option-card:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Selected option is obvious by fill + border, not colour alone. */
+.option-card--selected {
+  border-color: var(--color-primary);
+  background-color: #eef8f0;
+}
+
+.option-card__label {
+  font-weight: bold;
+}
+
+.option-card__desc {
+  font-size: var(--font-small);
+  color: var(--color-text-muted);
+}
+
+.option-card__price {
+  white-space: nowrap;
+  font-weight: bold;
+  color: var(--color-primary-dark);
+}
+
+.modal__included {
+  margin: 0;
+  color: var(--color-text);
+}
+
+/* Extras with large plus/minus quantity controls */
+.extra-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.extra-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.extra-row__info {
+  display: flex;
+  flex-direction: column;
+}
+
+.extra-row__name {
+  font-weight: bold;
+}
+
+.extra-row__price {
+  font-size: var(--font-small);
+  color: var(--color-text-muted);
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.stepper__btn {
+  width: var(--touch-target);
+  height: var(--touch-target);
+  border: 2px solid var(--color-primary);
+  background-color: var(--color-surface);
+  color: var(--color-primary-dark);
+  border-radius: var(--radius-md);
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.stepper__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.stepper__btn:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.stepper__value {
+  min-width: 28px;
+  text-align: center;
+  font-weight: bold;
+  font-size: var(--font-price);
+}
+
+.modal__footer {
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.modal__total {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-price);
+  font-weight: bold;
+  color: var(--color-primary-dark);
+}
+
+.modal__error {
+  min-height: 18px;
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--font-small);
+  font-weight: bold;
+}
+
+.modal__actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.modal__actions .btn {
+  flex: 1;
+}
+
+/* Centre the modal on wider screens instead of a bottom sheet. */
+@media (min-width: 640px) {
+  .modal {
+    align-items: center;
+  }
+
+  .modal__panel {
+    border-radius: var(--radius-lg);
+  }
+}
+
+/* --- Login view and PIN pad --------------------------------------------- */
+.login {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+  background-color: var(--color-background);
+}
+
+.login__card {
+  width: 100%;
+  max-width: 360px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+  padding: var(--space-lg);
+  text-align: center;
+}
+
+.login__business {
+  margin: 0;
+  font-size: var(--font-section-title);
+  color: var(--color-primary-dark);
+}
+
+.login__prompt {
+  margin: var(--space-sm) 0 var(--space-md);
+  color: var(--color-text-muted);
+}
+
+/* Masked PIN dots. */
+.pin-dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-sm);
+  min-height: 20px;
+  margin-bottom: var(--space-sm);
+}
+
+.pin-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--color-primary);
+}
+
+.pin-dot--filled {
+  background-color: var(--color-primary);
+}
+
+/* Reserve space so the pad does not jump when an error appears/clears. */
+.login__error {
+  min-height: 20px;
+  margin: 0 0 var(--space-md);
+  color: var(--color-danger);
+  font-size: var(--font-small);
+  font-weight: bold;
+}
+
+.pin-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-sm);
+}
+
+.pin-key {
+  min-height: 64px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: 24px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.pin-key:hover {
+  border-color: var(--color-primary);
+}
+
+.pin-key:active {
+  background-color: var(--color-background);
+}
+
+.pin-key:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Clear and Backspace are secondary, so digits stay the visual focus. */
+.pin-key--action {
+  font-size: var(--font-button);
+  color: var(--color-text-muted);
+  background-color: var(--color-background);
 }
