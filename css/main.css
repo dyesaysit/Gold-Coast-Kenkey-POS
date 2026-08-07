@@ -1034,3 +1034,117 @@ body {
   gap: var(--space-sm);
   flex-wrap: wrap;
 }
+
+/* --- Checkout & receipt ------------------------------------------------- */
+.checkout__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.checkout__row--total {
+  font-size: var(--font-price);
+  font-weight: bold;
+  color: var(--color-primary-dark);
+  margin-bottom: var(--space-sm);
+}
+
+.checkout__change {
+  font-weight: bold;
+  color: var(--color-primary-dark);
+  margin-top: var(--space-sm);
+}
+
+.pay-methods {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.pay-method {
+  flex: 1;
+  min-height: var(--touch-target);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-button);
+  font-family: inherit;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.pay-method:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Selected method is filled, not colour-only. */
+.pay-method--active {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-surface);
+}
+
+.receipt {
+  font-size: var(--font-body);
+  color: var(--color-text);
+}
+
+.receipt__business {
+  margin: 0;
+  font-size: var(--font-section-title);
+  color: var(--color-primary-dark);
+  text-align: center;
+}
+
+.receipt__meta {
+  margin: var(--space-xs) 0 var(--space-md);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-small);
+}
+
+.receipt__items {
+  list-style: none;
+  margin: 0 0 var(--space-md);
+  padding: 0;
+  border-top: 1px dashed var(--color-border);
+  border-bottom: 1px dashed var(--color-border);
+}
+
+.receipt__item {
+  padding: var(--space-sm) 0;
+}
+
+.receipt__item-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  font-weight: bold;
+}
+
+.receipt__item-detail {
+  font-size: var(--font-small);
+  color: var(--color-text-muted);
+}
+
+.receipt__line {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.receipt__line--total {
+  margin-top: var(--space-xs);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--font-price);
+  font-weight: bold;
+  color: var(--color-primary-dark);
+}
+
+.receipt__thanks {
+  margin: var(--space-md) 0 0;
+  text-align: center;
+  color: var(--color-text-muted);
+}

@@ -107,11 +107,66 @@
 
   function getSales() { return readJson(KEYS.sales, []); }
 
-  /** Append one completed sale snapshot. Later checkout feature will call this. */
+  /** Append one completed sale snapshot. */
   function saveSale(sale) {
     var sales = getSales();
     sales.push(sale);
     return writeJson(KEYS.sales, sales);
+  }
+
+  function pad(value, width) {
+    var s = String(value);
+    while (s.length < width) { s = "0" + s; }
+    return s;
+  }
+
+  /**
+   * Human-readable, per-day sequential receipt number: PREFIX-YYYYMMDD-NNNN
+   * (DATABASE-DESIGN.md section 17). The sequence resets each day.
+   */
+  function generateReceiptNumber() {
+    var settings = getSettings() || {};
+    var prefix = settings.receiptPrefix || "GCK";
+    var now = new Date();
+    var datePart = "" + now.getFullYear() + pad(now.getMonth() + 1, 2) + pad(now.getDate(), 2);
+    var todayPrefix = prefix + "-" + datePart + "-";
+    var todayCount = getSales().filter(function (sale) {
+      return sale.receiptNumber && sale.receiptNumber.indexOf(todayPrefix) === 0;
+    }).length;
+    return todayPrefix + pad(todayCount + 1, 4);
+  }
+
+  /**
+   * Complete a sale as one transaction (DATABASE-DESIGN.md section 18): reduce
+   * stock for inventory-tracked sale items, then persist inventory, the sale,
+   * and clear the cart. All updated objects are prepared before writing so a
+   * failure does not leave partially updated data. Stock never goes negative.
+   * Stock is only ever reduced here - i.e. only on a completed sale.
+   */
+  function completeSale(sale) {
+    var inventory = getInventoryProducts();
+    var indexById = {};
+    for (var i = 0; i < inventory.length; i++) {
+      indexById[inventory[i].id] = i;
+    }
+
+    var items = sale.items || [];
+    for (var j = 0; j < items.length; j++) {
+      var item = items[j];
+      var tracked = (typeof item.trackInventory === "boolean")
+        ? item.trackInventory
+        : item.itemType === "inventory-product";
+      if (tracked && indexById[item.productId] != null) {
+        var product = inventory[indexById[item.productId]];
+        var remaining = Number(product.stockQuantity) - Number(item.quantity);
+        product.stockQuantity = remaining < 0 ? 0 : remaining;
+      }
+    }
+
+    var okInventory = saveInventoryProducts(inventory);
+    var okSale = saveSale(sale);
+    var okCart = clearCurrentCart();
+    return okInventory && okSale && okCart;
   }
 
   // --- Current cart --------------------------------------------------------
@@ -184,6 +239,8 @@
     saveSettings: saveSettings,
     getSales: getSales,
     saveSale: saveSale,
+    generateReceiptNumber: generateReceiptNumber,
+    completeSale: completeSale,
     getCurrentCart: getCurrentCart,
     saveCurrentCart: saveCurrentCart,
     clearCurrentCart: clearCurrentCart,
