@@ -71,6 +71,29 @@
     elements.checkoutButton = document.getElementById("checkout-button");
     elements.toast = document.getElementById("toast");
 
+    // Checkout modal
+    elements.checkoutModal = document.getElementById("checkout-modal");
+    elements.checkoutOverlay = document.getElementById("checkout-overlay");
+    elements.checkoutClose = document.getElementById("checkout-close");
+    elements.checkoutTotal = document.getElementById("checkout-total");
+    elements.payCash = document.getElementById("pay-cash");
+    elements.payMomo = document.getElementById("pay-momo");
+    elements.cashFields = document.getElementById("cash-fields");
+    elements.momoFields = document.getElementById("momo-fields");
+    elements.checkoutAmount = document.getElementById("checkout-amount");
+    elements.checkoutChange = document.getElementById("checkout-change");
+    elements.checkoutMomoRef = document.getElementById("checkout-momo-ref");
+    elements.checkoutError = document.getElementById("checkout-error");
+    elements.checkoutCancel = document.getElementById("checkout-cancel");
+    elements.checkoutComplete = document.getElementById("checkout-complete");
+
+    // Receipt modal
+    elements.receiptModal = document.getElementById("receipt-modal");
+    elements.receiptOverlay = document.getElementById("receipt-overlay");
+    elements.receiptClose = document.getElementById("receipt-close");
+    elements.receiptContent = document.getElementById("receipt-content");
+    elements.receiptDone = document.getElementById("receipt-done");
+
     // Meal configuration modal
     elements.mealModal = document.getElementById("meal-modal");
     elements.modalOverlay = document.getElementById("modal-overlay");
@@ -1076,6 +1099,7 @@
     var total = pricing.calculateSaleTotal(subtotal, 0);
     elements.cartSubtotal.textContent = money.formatMoney(subtotal);
     elements.cartTotal.textContent = money.formatMoney(total);
+    elements.checkoutButton.disabled = empty; // no checkout with an empty cart
   }
 
   function buildCartLine(item) {
@@ -1543,6 +1567,255 @@
     reader.readAsDataURL(file);
   }
 
+  // --- Checkout (Cash / MoMo) ---------------------------------------------
+
+  var checkoutMethod = "cash"; // "cash" | "momo"
+  var isCompleting = false;    // guards against duplicate submission
+
+  function bindCheckoutEvents() {
+    elements.checkoutButton.addEventListener("click", openCheckout);
+    elements.payCash.addEventListener("click", function () { selectMethod("cash"); });
+    elements.payMomo.addEventListener("click", function () { selectMethod("momo"); });
+    elements.checkoutAmount.addEventListener("input", updateChange);
+    elements.checkoutComplete.addEventListener("click", completeCheckout);
+    elements.checkoutCancel.addEventListener("click", closeCheckout);
+    elements.checkoutClose.addEventListener("click", closeCheckout);
+    elements.checkoutOverlay.addEventListener("click", closeCheckout);
+    elements.receiptDone.addEventListener("click", closeReceipt);
+    elements.receiptClose.addEventListener("click", closeReceipt);
+    elements.receiptOverlay.addEventListener("click", closeReceipt);
+    document.addEventListener("keydown", function (event) {
+      if (event.key !== "Escape") { return; }
+      if (!elements.checkoutModal.hidden) { closeCheckout(); }
+      else if (!elements.receiptModal.hidden) { closeReceipt(); }
+    });
+  }
+
+  function currentSaleTotal() {
+    var subtotal = pricing.calculateCartSubtotal(state.cart);
+    return pricing.calculateSaleTotal(subtotal, 0);
+  }
+
+  function openCheckout() {
+    if (validation.isCartEmpty(state.cart)) {
+      showToast("The cart is empty. Add an item before checkout.");
+      return;
+    }
+    isCompleting = false;
+    elements.checkoutComplete.disabled = false;
+    elements.checkoutAmount.value = "";
+    elements.checkoutMomoRef.value = "";
+    setCheckoutError("");
+    elements.checkoutTotal.textContent = money.formatMoney(currentSaleTotal());
+    selectMethod("cash");
+    elements.checkoutModal.hidden = false;
+    elements.checkoutAmount.focus();
+  }
+
+  function closeCheckout() {
+    elements.checkoutModal.hidden = true;
+  }
+
+  function selectMethod(method) {
+    checkoutMethod = method;
+    var isCash = (method === "cash");
+    elements.payCash.classList.toggle("pay-method--active", isCash);
+    elements.payMomo.classList.toggle("pay-method--active", !isCash);
+    elements.payCash.setAttribute("aria-checked", isCash ? "true" : "false");
+    elements.payMomo.setAttribute("aria-checked", !isCash ? "true" : "false");
+    elements.cashFields.hidden = !isCash;
+    elements.momoFields.hidden = isCash;
+    setCheckoutError("");
+    if (isCash) { updateChange(); }
+  }
+
+  /** Live change display (cash only). Never shows a negative change. */
+  function updateChange() {
+    var change = pricing.calculateChange(Number(elements.checkoutAmount.value), currentSaleTotal());
+    elements.checkoutChange.textContent = money.formatMoney(change < 0 ? 0 : change);
+  }
+
+  function setCheckoutError(message) {
+    elements.checkoutError.textContent = message;
+  }
+
+  function completeCheckout() {
+    if (isCompleting) {
+      return; // duplicate-submission guard
+    }
+    if (validation.isCartEmpty(state.cart)) {
+      setCheckoutError("The cart is empty.");
+      return;
+    }
+
+    var total = currentSaleTotal();
+    var payment;
+
+    if (checkoutMethod === "cash") {
+      // Requires amount received, rejects below total (shared validator).
+      var check = validation.validateCheckout(state.cart, elements.checkoutAmount.value);
+      if (!check.valid) {
+        setCheckoutError(check.message);
+        return;
+      }
+      var amountPaid = money.roundMoney(Number(elements.checkoutAmount.value));
+      payment = {
+        method: "cash",
+        amountPaid: amountPaid,
+        change: pricing.calculateChange(amountPaid, total) // shared pricing
+      };
+    } else {
+      // MoMo: amount paid equals the total, no change, optional reference.
+      payment = {
+        method: "momo",
+        amountPaid: total,
+        change: 0,
+        reference: elements.checkoutMomoRef.value.trim()
+      };
+    }
+
+    // The sale is going through: lock out further clicks before any writes.
+    isCompleting = true;
+    elements.checkoutComplete.disabled = true;
+
+    var sale = {
+      id: createId("sale"),
+      receiptNumber: storage.generateReceiptNumber(),
+      createdAt: new Date().toISOString(),
+      cashier: currentUser ? { id: currentUser.id, name: currentUser.name } : null,
+      items: JSON.parse(JSON.stringify(state.cart)), // snapshot of names/prices
+      subtotal: pricing.calculateCartSubtotal(state.cart),
+      discount: 0,
+      total: total,
+      payment: payment,
+      status: "completed"
+    };
+
+    // Stock is only reduced here, inside a completed sale.
+    var ok = storage.completeSale(sale);
+    if (!ok) {
+      isCompleting = false;
+      elements.checkoutComplete.disabled = false;
+      setCheckoutError("Could not complete the sale. Please try again.");
+      return;
+    }
+
+    // Refresh from storage: cart cleared, inventory stock reduced.
+    state.cart = storage.getCurrentCart();
+    state.inventoryProducts = storage.getInventoryProducts();
+    renderProducts();
+    renderCart();
+
+    closeCheckout();
+    showReceipt(sale);
+    showToast("Sale completed. Receipt " + sale.receiptNumber + ".");
+  }
+
+  // --- Receipt -------------------------------------------------------------
+
+  function showReceipt(sale) {
+    renderReceipt(sale);
+    elements.receiptModal.hidden = false;
+    elements.receiptDone.focus();
+  }
+
+  function closeReceipt() {
+    elements.receiptModal.hidden = true;
+  }
+
+  function renderReceipt(sale) {
+    var settings = state.settings || {};
+    var container = elements.receiptContent;
+    container.innerHTML = "";
+
+    var business = document.createElement("h3");
+    business.className = "receipt__business";
+    business.textContent = settings.businessName || "Receipt";
+    container.appendChild(business);
+
+    var meta = document.createElement("p");
+    meta.className = "receipt__meta";
+    var cashierLine = (sale.cashier && sale.cashier.name) ? " · Cashier: " + sale.cashier.name : "";
+    meta.textContent = sale.receiptNumber + " · " + formatDateTime(sale.createdAt) + cashierLine;
+    container.appendChild(meta);
+
+    var list = document.createElement("ul");
+    list.className = "receipt__items";
+    for (var i = 0; i < sale.items.length; i++) {
+      list.appendChild(buildReceiptItem(sale.items[i]));
+    }
+    container.appendChild(list);
+
+    container.appendChild(receiptLine("Total", money.formatMoney(sale.total), "receipt__line--total"));
+    container.appendChild(receiptLine("Payment method", sale.payment.method === "momo" ? "MoMo" : "Cash"));
+
+    if (sale.payment.method === "cash") {
+      container.appendChild(receiptLine("Amount paid", money.formatMoney(sale.payment.amountPaid)));
+      container.appendChild(receiptLine("Change", money.formatMoney(sale.payment.change)));
+    } else if (sale.payment.reference) {
+      container.appendChild(receiptLine("MoMo reference", sale.payment.reference));
+    }
+
+    var thanks = document.createElement("p");
+    thanks.className = "receipt__thanks";
+    thanks.textContent = "Thank you!";
+    container.appendChild(thanks);
+  }
+
+  function buildReceiptItem(item) {
+    var li = document.createElement("li");
+    li.className = "receipt__item";
+
+    var row = document.createElement("div");
+    row.className = "receipt__item-row";
+    var name = document.createElement("span");
+    name.textContent = (isConfiguredMeal(item) && item.portion)
+      ? item.productName + " — " + item.portion.name
+      : item.productName;
+    var lineTotal = document.createElement("span");
+    lineTotal.textContent = money.formatMoney(item.lineTotal);
+    row.appendChild(name);
+    row.appendChild(lineTotal);
+    li.appendChild(row);
+
+    var details = [];
+    var unit = (item.unitTotal != null) ? item.unitTotal : item.unitPrice;
+    details.push("Qty " + item.quantity + " × " + money.formatMoney(unit));
+    if (isConfiguredMeal(item)) {
+      if (item.protein) { details.push("Protein: " + item.protein.name); }
+      if (item.extras && item.extras.length) {
+        details.push("Extras: " + item.extras.map(function (e) {
+          return e.name + " × " + e.quantity;
+        }).join(", "));
+      }
+    }
+    var detail = document.createElement("div");
+    detail.className = "receipt__item-detail";
+    detail.textContent = details.join(" · ");
+    li.appendChild(detail);
+    return li;
+  }
+
+  function receiptLine(label, value, extraClass) {
+    var row = document.createElement("div");
+    row.className = "receipt__line" + (extraClass ? " " + extraClass : "");
+    var labelEl = document.createElement("span");
+    labelEl.textContent = label;
+    var valueEl = document.createElement("span");
+    valueEl.textContent = value;
+    row.appendChild(labelEl);
+    row.appendChild(valueEl);
+    return row;
+  }
+
+  function formatDateTime(iso) {
+    try {
+      return new Date(iso).toLocaleString();
+    } catch (error) {
+      return iso;
+    }
+  }
+
   // --- Startup -------------------------------------------------------------
 
   function init() {
@@ -1553,6 +1826,7 @@
     bindAuthEvents();
     bindModalEvents();
     bindManageEvents();
+    bindCheckoutEvents();
 
     // POS content can be rendered while hidden; it is revealed after login.
     renderCategories();
