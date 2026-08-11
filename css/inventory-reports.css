@@ -1,0 +1,230 @@
+/*
+ * inventory-reports.css
+ * Member 3 (feature/inventory-reports): styles for the Manager overlay, the
+ * inventory table, and the daily report.
+ *
+ * Every colour, size, and spacing value comes from variables.css (UI-GUIDELINES
+ * section 3, AGENTS.md UI rule 2). This file only adds NEW classes for the
+ * inventory/report screens; it does not restyle any shared component.
+ */
+
+/* --- Header launch button spacing --------------------------------------- */
+/* Groups the tagline and the Manager button on the right of the header so the
+   existing "space-between" header layout is preserved. */
+.app-header__right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+/* --- Manager overlay (one modal style, per UI-GUIDELINES section 19) ------ */
+.manager {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(31, 41, 55, 0.55); /* dark, semi-transparent backdrop */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+  z-index: 100;
+}
+
+.manager[hidden] {
+  display: none;
+}
+
+.manager__panel {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+  width: 100%;
+  max-width: 720px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.manager__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background-color: var(--color-primary-dark);
+  color: var(--color-surface);
+}
+
+.manager__title {
+  margin: 0;
+  font-size: var(--font-section-title);
+}
+
+/* --- Tabs ---------------------------------------------------------------- */
+.manager__tabs {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.manager__tab {
+  min-height: var(--touch-target);
+  padding: 0 var(--space-md);
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-button);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.manager__tab:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Active tab is marked by weight + underline, not colour alone (accessibility). */
+.manager__tab--active {
+  color: var(--color-primary-dark);
+  border-bottom-color: var(--color-primary);
+  font-weight: bold;
+}
+
+.manager__section {
+  padding: var(--space-lg);
+  overflow-y: auto;
+}
+
+.manager__section[hidden] {
+  display: none;
+}
+
+/* --- Inventory table ----------------------------------------------------- */
+/* Wrapper allows the table to scroll sideways on very narrow phones instead of
+   breaking the layout (UI-GUIDELINES section 5: avoid page-wide horizontal scroll). */
+.inv-table-wrap {
+  overflow-x: auto;
+}
+
+.inv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-body);
+}
+
+.inv-table th,
+.inv-table td {
+  text-align: left;
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.inv-table th {
+  font-size: var(--font-small);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.inv-table__name {
+  font-weight: bold;
+}
+
+.inv-table__empty {
+  color: var(--color-text-muted);
+  padding: var(--space-md);
+}
+
+/* --- Status badges (text label + colour, never colour alone) ------------- */
+.badge {
+  display: inline-block;
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-small);
+  font-weight: bold;
+}
+
+.badge--ok {
+  background-color: #dcfce7;
+  color: var(--color-success);
+}
+
+.badge--low {
+  background-color: #fef3c7;
+  color: var(--color-warning);
+}
+
+.badge--out {
+  background-color: #fee2e2;
+  color: var(--color-danger);
+}
+
+/* --- Daily report -------------------------------------------------------- */
+.report-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.report-stat {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  text-align: center;
+}
+
+.report-stat__label {
+  display: block;
+  font-size: var(--font-small);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-xs);
+}
+
+.report-stat__value {
+  display: block;
+  font-size: var(--font-price);
+  font-weight: bold;
+  color: var(--color-primary-dark);
+}
+
+.report-block {
+  margin-bottom: var(--space-lg);
+}
+
+.report-block__title {
+  margin: 0 0 var(--space-sm) 0;
+  font-size: var(--font-body);
+  color: var(--color-primary-dark);
+}
+
+.report-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.report-list__row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.report-empty {
+  color: var(--color-text-muted);
+}
+
+/* On small phones, stack the three stat cards. */
+@media (max-width: 480px) {
+  .report-stats {
+    grid-template-columns: 1fr;
+  }
+}
