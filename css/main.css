@@ -1,0 +1,378 @@
+/*
+ * main.css
+ * Base layout and shared components (header, category bar, product tiles, cart).
+ * Mobile-first: this file styles the small-screen layout; responsive.css adds
+ * the tablet and desktop columns. Colours come from variables.css only.
+ */
+
+/* --- Reset / base -------------------------------------------------------- */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-body);
+  color: var(--color-text);
+  background-color: var(--color-background);
+  line-height: 1.4;
+}
+
+/* Full-height column layout so the cart can sit at the bottom on mobile. */
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* --- Header -------------------------------------------------------------- */
+.app-header {
+  background-color: var(--color-primary-dark);
+  color: var(--color-surface);
+  padding: var(--space-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.app-header__title {
+  margin: 0;
+  font-size: var(--font-page-title);
+  font-weight: bold;
+}
+
+.app-header__tagline {
+  margin: 0;
+  font-size: var(--font-small);
+  color: var(--color-accent);
+}
+
+/* --- Category bar -------------------------------------------------------- */
+.category-bar {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  overflow-x: auto; /* horizontal scroll on narrow screens only for chips */
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.category-chip {
+  flex: 0 0 auto;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-md);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-button);
+  cursor: pointer;
+}
+
+.category-chip:hover {
+  border-color: var(--color-primary);
+}
+
+.category-chip:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* The active category is obvious by fill, not colour alone (accessibility). */
+.category-chip--active {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-surface);
+  font-weight: bold;
+}
+
+/* --- Main area: products + cart ----------------------------------------- */
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+}
+
+.section-title {
+  margin: 0 0 var(--space-sm) 0;
+  font-size: var(--font-section-title);
+  color: var(--color-primary-dark);
+}
+
+/* --- Product grid and tiles --------------------------------------------- */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* two tiles per row on mobile */
+  gap: var(--space-md);
+}
+
+.product-tile {
+  display: flex;
+  flex-direction: column;
+  min-height: 170px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-tile);
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  font-family: inherit;
+}
+
+.product-tile:hover {
+  border-color: var(--color-primary);
+}
+
+.product-tile:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.product-tile__image {
+  height: 110px;
+  background-color: var(--color-background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.product-tile__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/*
+ * Picture placeholder shown for every product until a real food photo is added.
+ * The dashed frame makes it obvious that a picture can be dropped in later, so
+ * the owner only has to replace the image file referenced in the product data.
+ */
+.product-tile__placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  color: var(--color-text-muted);
+  background-color: var(--color-background);
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.product-tile__placeholder-icon {
+  font-size: 36px;
+  line-height: 1;
+}
+
+.product-tile__placeholder-label {
+  font-size: var(--font-small);
+}
+
+.product-tile__body {
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  flex: 1;
+}
+
+.product-tile__name {
+  font-size: var(--font-tile-title);
+  font-weight: bold;
+}
+
+.product-tile__price {
+  font-size: var(--font-price);
+  color: var(--color-primary-dark);
+  font-weight: bold;
+}
+
+.product-tile__stock {
+  font-size: var(--font-small);
+  color: var(--color-text-muted);
+}
+
+.product-tile__stock--low {
+  color: var(--color-warning);
+  font-weight: bold;
+}
+
+/* --- Cart ---------------------------------------------------------------- */
+.cart {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.cart__title {
+  margin: 0;
+  font-size: var(--font-section-title);
+  color: var(--color-primary-dark);
+}
+
+.cart__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.cart__empty {
+  color: var(--color-text-muted);
+  padding: var(--space-md) 0;
+}
+
+.cart-item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.cart-item__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.cart-item__name {
+  font-weight: bold;
+}
+
+.cart-item__meta {
+  font-size: var(--font-small);
+  color: var(--color-text-muted);
+}
+
+.cart-item__line-total {
+  font-weight: bold;
+  color: var(--color-primary-dark);
+}
+
+.cart__summary {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.cart__summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-body);
+}
+
+.cart__summary-row--total {
+  font-size: var(--font-price);
+  font-weight: bold;
+  color: var(--color-primary-dark);
+}
+
+/* --- Shared buttons ------------------------------------------------------ */
+.btn {
+  min-height: var(--touch-target);
+  min-width: var(--touch-target);
+  padding: 0 var(--space-md);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-button);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.btn:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.btn--primary {
+  background-color: var(--color-primary);
+  color: var(--color-surface);
+  font-weight: bold;
+}
+
+.btn--accent {
+  background-color: var(--color-accent);
+  color: var(--color-text);
+  font-weight: bold;
+}
+
+.btn--danger {
+  background-color: var(--color-surface);
+  color: var(--color-danger);
+  border: 2px solid var(--color-danger);
+}
+
+.btn--secondary {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  border: 2px solid var(--color-border);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn--icon {
+  padding: 0;
+}
+
+/* --- Toast message (lightweight feedback, no library) -------------------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-lg);
+  transform: translateX(-50%);
+  background-color: var(--color-primary-dark);
+  color: var(--color-surface);
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+  font-size: var(--font-body);
+  max-width: 90%;
+  text-align: center;
+  z-index: 50;
+}
+
+.toast[hidden] {
+  display: none;
+}
+
+/* Utility */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
