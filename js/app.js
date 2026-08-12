@@ -25,6 +25,8 @@
   var auth = global.GCK.auth;
   var reports = global.GCK.reports;
   var reportPdf = global.GCK.reportPdf;
+  var inventoryReport = global.GCK.inventoryReport;
+  var inventoryReportPdf = global.GCK.inventoryReportPdf;
 
   // In-memory view of catalogue data, loaded once from storage.
   var state = {
@@ -125,6 +127,24 @@
     elements.manageClose = document.getElementById("manage-close");
     elements.manageHint = document.getElementById("manage-hint");
     elements.manageList = document.getElementById("manage-list");
+    elements.inventoryPrintFormat = document.getElementById("inventory-print-format");
+    elements.inventoryPrintSize = document.getElementById("inventory-print-size");
+    elements.inventoryPrint = document.getElementById("inventory-print");
+    elements.inventoryExportPdf = document.getElementById("inventory-export-pdf");
+    elements.inventoryReport = document.getElementById("inventory-report");
+    elements.inventoryReportLogo = document.getElementById("inventory-report-logo");
+    elements.inventoryReportBusiness = document.getElementById("inventory-report-business");
+    elements.inventoryReportPhone = document.getElementById("inventory-report-phone");
+    elements.inventoryReportAddress = document.getElementById("inventory-report-address");
+    elements.inventoryReportGenerated = document.getElementById("inventory-report-generated");
+    elements.inventoryReportContext = document.getElementById("inventory-report-context");
+    elements.inventoryTotalProducts = document.getElementById("inventory-total-products");
+    elements.inventoryTotalUnits = document.getElementById("inventory-total-units");
+    elements.inventoryLowCount = document.getElementById("inventory-low-count");
+    elements.inventoryOutCount = document.getElementById("inventory-out-count");
+    elements.inventoryReportSearch = document.getElementById("inventory-report-search");
+    elements.inventoryReportFilters = document.getElementById("inventory-report-filters");
+    elements.inventoryReportTable = document.getElementById("inventory-report-table");
 
     elements.usersView = document.getElementById("users-view");
     elements.userList = document.getElementById("user-list");
@@ -1277,9 +1297,27 @@
 
   var editingProductId = null;
   var formImage = ""; // current image (data URI or path); "" means none
+  var inventoryFilter = "all";
+  var currentInventorySummary = null;
+  var currentInventoryProducts = [];
 
   function bindManageEvents() {
     elements.manageClose.addEventListener("click", closeManagementPage);
+    elements.inventoryReportSearch.addEventListener("input", renderInventoryReportTable);
+    elements.inventoryReportFilters.addEventListener("click", function (event) {
+      var button = event.target.closest("[data-filter]");
+      if (!button) { return; }
+      inventoryFilter = button.getAttribute("data-filter");
+      var buttons = elements.inventoryReportFilters.querySelectorAll("[data-filter]");
+      for (var i = 0; i < buttons.length; i++) {
+        buttons[i].classList.toggle("inventory-filter--active", buttons[i] === button);
+      }
+      renderInventoryReportTable();
+    });
+    elements.inventoryPrint.addEventListener("click", function () {
+      printInventoryReport(elements.inventoryPrintSize.value);
+    });
+    elements.inventoryExportPdf.addEventListener("click", downloadInventoryReportPdf);
     elements.manageAdd.addEventListener("click", function () {
       openProductForm(null);
     });
@@ -1325,10 +1363,114 @@
     var isInventory = (key === "inventory");
     elements.manageTitle.textContent = isInventory ? "Inventory & Stock" : "Products";
     elements.manageAdd.hidden = isInventory; // the stock view does not add products
+    elements.inventoryPrintFormat.hidden = !isInventory;
+    elements.inventoryPrint.hidden = !isInventory;
+    elements.inventoryExportPdf.hidden = !isInventory;
+    elements.inventoryReport.hidden = !isInventory;
     elements.manageHint.textContent = isInventory
       ? "Update stock for inventory-tracked products."
       : "Add or edit products. Configured meals are priced by their portions.";
+    if (isInventory) { renderInventoryReport(); }
     renderManageList(key);
+  }
+
+  function renderInventoryReport() {
+    if (!currentUser || !auth.canAccess(currentUser.role, "inventory")) {
+      showToast("You do not have access to Inventory.");
+      showSection("pos");
+      return false;
+    }
+    currentInventorySummary = inventoryReport.getSummary();
+    var settings = state.settings || {};
+    renderLogo(elements.inventoryReportLogo, settings);
+    elements.inventoryReportBusiness.textContent = settings.businessName || "Business Report";
+    setReportBusinessDetail(elements.inventoryReportPhone, "Telephone", settings.phone);
+    setReportBusinessDetail(elements.inventoryReportAddress, "Address", settings.address);
+    elements.inventoryReportGenerated.textContent = "Generated: " + reports.formatDateTime(new Date());
+    elements.inventoryTotalProducts.textContent = String(currentInventorySummary.totalProducts);
+    elements.inventoryTotalUnits.textContent = String(currentInventorySummary.totalUnits);
+    elements.inventoryLowCount.textContent = String(currentInventorySummary.lowStockCount);
+    elements.inventoryOutCount.textContent = String(currentInventorySummary.outOfStockCount);
+    renderInventoryReportTable();
+    return true;
+  }
+
+  function renderInventoryReportTable() {
+    if (!currentInventorySummary) { return; }
+    var search = elements.inventoryReportSearch.value;
+    currentInventoryProducts = inventoryReport.filterProducts(
+      currentInventorySummary.products,
+      inventoryFilter,
+      search
+    );
+    var filterLabels = { all: "All products", low: "Low Stock", out: "Out of Stock" };
+    var context = "Filter: " + filterLabels[inventoryFilter];
+    if (search.trim()) { context += " | Search: " + search.trim(); }
+    elements.inventoryReportContext.textContent = context;
+    elements.inventoryReportTable.innerHTML = "";
+    if (!currentInventoryProducts.length) {
+      var emptyRow = document.createElement("tr");
+      var emptyCell = document.createElement("td");
+      emptyCell.colSpan = 4;
+      emptyCell.className = "inventory-table__empty";
+      emptyCell.textContent = "No inventory products match this filter.";
+      emptyRow.appendChild(emptyCell);
+      elements.inventoryReportTable.appendChild(emptyRow);
+      return;
+    }
+    for (var i = 0; i < currentInventoryProducts.length; i++) {
+      var product = currentInventoryProducts[i];
+      var row = document.createElement("tr");
+      appendInventoryCell(row, "Product name", product.name);
+      appendInventoryCell(row, "Current stock", String(product.stockQuantity));
+      appendInventoryCell(row, "Low-stock threshold", String(product.lowStockLevel));
+      var statusCell = appendInventoryCell(row, "Status", inventoryStatusLabel(product.status));
+      statusCell.firstChild.className = "inventory-status inventory-status--" + product.status;
+      elements.inventoryReportTable.appendChild(row);
+    }
+  }
+
+  function appendInventoryCell(row, label, value) {
+    var cell = document.createElement("td");
+    cell.setAttribute("data-label", label);
+    var content = document.createElement("span");
+    content.textContent = value;
+    cell.appendChild(content);
+    row.appendChild(cell);
+    return cell;
+  }
+
+  function inventoryStatusLabel(status) {
+    return status === "out" ? "Out of Stock" : status === "low" ? "Low Stock" : "In Stock";
+  }
+
+  function printInventoryReport(format) {
+    if (!renderInventoryReport()) { return; }
+    document.body.classList.add("printing-inventory");
+    document.body.classList.add(format === "58mm" ? "inventory-print-58" :
+      format === "a4" ? "inventory-print-a4" : "inventory-print-80");
+    window.print();
+  }
+
+  function downloadInventoryReportPdf() {
+    if (!renderInventoryReport() || !currentInventorySummary) { return; }
+    var blob = inventoryReportPdf.createPdf(
+      currentInventorySummary,
+      currentInventoryProducts,
+      state.settings || {},
+      elements.inventoryReportGenerated.textContent,
+      elements.inventoryReportContext.textContent
+    );
+    var downloadUrl = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = "inventory-report.pdf";
+    link.hidden = true;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function () { URL.revokeObjectURL(downloadUrl); }, 1000);
+    showToast("Inventory PDF downloaded.");
   }
 
   function renderManageList(key) {
@@ -1797,6 +1939,7 @@
 
   function clearReportPrintMode() {
     document.body.classList.remove("printing-report", "report-print-58", "report-print-80", "report-print-a4");
+    document.body.classList.remove("printing-inventory", "inventory-print-58", "inventory-print-80", "inventory-print-a4");
   }
 
   function renderReportRows(container, items, mapItem, emptyMessage) {

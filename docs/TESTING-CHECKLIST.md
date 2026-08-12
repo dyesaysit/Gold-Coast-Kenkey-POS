@@ -130,6 +130,15 @@ Expected line total: GH₵144.00
 - [ ] Low-stock warning appears at the threshold.
 - [ ] Stock cannot become negative.
 - [ ] Multiple quantities reduce the correct amount.
+- [ ] Inventory Report includes only products with `trackInventory === true` and excludes configured meals.
+- [ ] Inventory Report product, unit, low-stock, and out-of-stock totals are correct.
+- [ ] Stock equal to the low-stock threshold is Low Stock; zero stock is Out of Stock.
+- [ ] All, Low Stock, and Out of Stock filters work together with product-name search.
+- [ ] Inventory Report generated date displays as DD-MM-YYYY.
+- [ ] Inventory Report print contains branding, filter/search context, totals, and the full filtered table.
+- [ ] Inventory Report defaults to 80 mm thermal and supports 58 mm and A4.
+- [ ] Inventory Report print hides navigation, controls, stock editor, and normal background.
+- [ ] Cashier cannot access Inventory; Supervisor and Admin can.
 
 ## 8. Checkout
 
