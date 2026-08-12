@@ -450,6 +450,23 @@ body {
   border: 2px solid var(--color-border);
 }
 
+/* Close actions use one consistent danger treatment across management pages
+   and modals. Cancel/Back/Done controls keep their existing meanings/styles. */
+.page-close,
+#manage-close,
+button.modal__close {
+  background-color: var(--color-danger);
+  color: var(--color-surface);
+  border-color: var(--color-danger);
+  font-weight: bold;
+}
+
+.page-close:hover,
+#manage-close:hover,
+button.modal__close:hover {
+  filter: brightness(0.9);
+}
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -970,6 +987,214 @@ body {
   color: var(--color-text-muted);
 }
 
+/* --- Daily reports ------------------------------------------------------ */
+.reports__date-field {
+  width: 100%;
+  max-width: 260px;
+}
+
+.reports__filters {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.date-picker {
+  position: relative;
+  display: flex;
+  width: 100%;
+}
+
+.date-picker__display {
+  width: 100%;
+  padding-right: 54px;
+}
+
+.date-picker__button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 44px;
+  height: 40px;
+  border: 0;
+  border-left: 1px solid var(--color-border);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--color-surface);
+  color: var(--color-primary-dark);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.date-picker__button:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.reports__print-format {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-small);
+  font-weight: bold;
+}
+
+.reports__print-format .field__input {
+  width: auto;
+  min-width: 210px;
+}
+
+.reports__error {
+  min-height: 0;
+}
+
+.reports__print-area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.reports__print-header {
+  align-self: center;
+  width: 100%;
+  max-width: 760px;
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-bottom: 3px solid var(--color-accent);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  text-align: center;
+}
+
+.reports__print-logo {
+  margin: 0 auto var(--space-sm);
+  width: 56px;
+  height: 56px;
+}
+
+.reports__business-name,
+.reports__period-title {
+  margin: 0;
+  color: var(--color-primary-dark);
+}
+
+.reports__business-detail,
+.reports__generated {
+  margin: var(--space-xs) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-small);
+}
+
+.reports__period-title {
+  margin-top: var(--space-sm);
+  font-size: var(--font-section-title);
+}
+
+.reports__metrics,
+.reports__details {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-md);
+}
+
+.report-card,
+.report-panel {
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+}
+
+.report-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.report-card__label,
+.report-panel__empty {
+  color: var(--color-text-muted);
+}
+
+.report-card__value {
+  color: var(--color-primary-dark);
+  font-size: var(--font-price);
+}
+
+.report-panel__title {
+  margin: 0 0 var(--space-sm);
+  color: var(--color-primary-dark);
+  font-size: var(--font-tile-title);
+}
+
+.report-panel__empty {
+  margin: 0;
+}
+
+.report-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.report-list__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.report-list__row:last-child {
+  border-bottom: 0;
+}
+
+.report-list__row strong {
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+@media (max-width: 480px) {
+  .reports__filters .reports__date-field,
+  .reports__filters .btn {
+    max-width: none;
+    width: 100%;
+  }
+
+  .report-list__row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .report-list__row strong {
+    text-align: left;
+  }
+
+  .reports__print-format,
+  .reports__print-format .field__input {
+    width: 100%;
+  }
+}
+
+@media (min-width: 640px) {
+  .reports__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .reports__metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .reports__details {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 .settings-form {
   display: grid;
   grid-template-columns: 1fr;
@@ -1400,5 +1625,181 @@ body {
   #receipt-modal .receipt__contact strong,
   #receipt-modal .receipt__meta-line strong {
     color: #000;
+  }
+}
+
+/* A4 Reports print mode. Kept separate from the receipt rules above so thermal
+   receipt printing remains unchanged when `printing-report` is absent. */
+@media print {
+  body.printing-report {
+    background: #ffffff !important;
+  }
+
+  body.printing-report > * {
+    display: none !important;
+  }
+
+  body.printing-report > #pos-view {
+    display: block !important;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    background: #ffffff;
+  }
+
+  body.printing-report #pos-view > * {
+    display: none !important;
+  }
+
+  body.printing-report #reports-view {
+    display: block !important;
+    padding: 10mm;
+    overflow: visible;
+  }
+
+  body.printing-report #reports-view > .manage__bar,
+  body.printing-report .reports__filters,
+  body.printing-report .reports__error {
+    display: none !important;
+  }
+
+  body.printing-report .reports__print-area {
+    display: block !important;
+    color: #000;
+  }
+
+  body.printing-report .reports__print-header,
+  body.printing-report .report-card,
+  body.printing-report .report-panel {
+    background: #ffffff;
+    border-color: #777;
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  body.printing-report .reports__print-header {
+    margin-bottom: 8mm;
+    border-bottom: 2px solid #000;
+  }
+
+  body.printing-report .reports__print-logo {
+    width: 24mm;
+    height: 24mm;
+  }
+
+  body.printing-report .reports__business-name,
+  body.printing-report .reports__period-title,
+  body.printing-report .report-card__value,
+  body.printing-report .report-panel__title {
+    color: #000;
+  }
+
+  body.printing-report .reports__metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5mm;
+    margin-bottom: 7mm;
+  }
+
+  body.printing-report .reports__details {
+    display: block;
+  }
+
+  body.printing-report .report-panel {
+    margin-bottom: 6mm;
+  }
+
+  body.printing-report .report-list,
+  body.printing-report .report-panel,
+  body.printing-report .reports__details {
+    max-height: none;
+    overflow: visible;
+  }
+
+  body.printing-report .report-list__row {
+    flex-direction: row;
+  }
+
+  body.printing-report #receipt-modal {
+    display: none !important;
+  }
+
+  body.report-print-80 #reports-view,
+  body.report-print-58 #reports-view {
+    box-sizing: border-box;
+    margin: 0 auto;
+    padding: 2mm;
+    font-size: 9pt;
+  }
+
+  body.report-print-80 #reports-view {
+    width: 76mm;
+  }
+
+  body.report-print-58 #reports-view {
+    width: 54mm;
+    font-size: 8pt;
+  }
+
+  body.report-print-80 .reports__print-header,
+  body.report-print-58 .reports__print-header {
+    margin-bottom: 3mm;
+    padding: 2mm 0;
+    border: 0;
+    border-bottom: 1px solid #000;
+    border-radius: 0;
+  }
+
+  body.report-print-80 .reports__print-logo,
+  body.report-print-58 .reports__print-logo {
+    width: 18mm;
+    height: 18mm;
+  }
+
+  body.report-print-80 .reports__business-name,
+  body.report-print-58 .reports__business-name {
+    font-size: 14pt;
+  }
+
+  body.report-print-80 .reports__period-title,
+  body.report-print-58 .reports__period-title {
+    font-size: 11pt;
+  }
+
+  body.report-print-80 .reports__metrics,
+  body.report-print-58 .reports__metrics {
+    grid-template-columns: 1fr;
+    gap: 1.5mm;
+    margin-bottom: 3mm;
+  }
+
+  body.report-print-80 .report-card,
+  body.report-print-58 .report-card,
+  body.report-print-80 .report-panel,
+  body.report-print-58 .report-panel {
+    padding: 2mm;
+    border-radius: 0;
+  }
+
+  body.report-print-80 .report-panel,
+  body.report-print-58 .report-panel {
+    margin-bottom: 3mm;
+  }
+
+  body.report-print-80 .report-card__value,
+  body.report-print-58 .report-card__value {
+    font-size: 12pt;
+  }
+
+  body.report-print-80 .report-list__row,
+  body.report-print-58 .report-list__row {
+    gap: 2mm;
+    padding: 1.5mm 0;
+  }
+
+  body.report-print-a4 #reports-view {
+    width: auto;
+    max-width: 190mm;
+    margin: 0 auto;
   }
 }

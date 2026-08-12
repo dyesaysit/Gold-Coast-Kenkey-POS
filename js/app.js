@@ -23,6 +23,8 @@
   var validation = global.GCK.validation;
   var storage = global.GCK.storage;
   var auth = global.GCK.auth;
+  var reports = global.GCK.reports;
+  var reportPdf = global.GCK.reportPdf;
 
   // In-memory view of catalogue data, loaded once from storage.
   var state = {
@@ -157,6 +159,32 @@
     elements.sfReceiptExtraInfo = document.getElementById("sf-receipt-extra-info");
     elements.sfReceiptPaper = document.getElementById("sf-receipt-paper");
     elements.settingsError = document.getElementById("settings-error");
+
+    elements.reportsView = document.getElementById("reports-view");
+    elements.reportsFromDate = document.getElementById("reports-from-date");
+    elements.reportsToDate = document.getElementById("reports-to-date");
+    elements.reportsFromNative = document.getElementById("reports-from-native");
+    elements.reportsToNative = document.getElementById("reports-to-native");
+    elements.reportsFromCalendar = document.getElementById("reports-from-calendar");
+    elements.reportsToCalendar = document.getElementById("reports-to-calendar");
+    elements.reportsApply = document.getElementById("reports-apply");
+    elements.reportsPrint = document.getElementById("reports-print");
+    elements.reportsExportPdf = document.getElementById("reports-export-pdf");
+    elements.reportsPrintSize = document.getElementById("reports-print-size");
+    elements.reportsError = document.getElementById("reports-error");
+    elements.reportsPrintLogo = document.getElementById("reports-print-logo");
+    elements.reportsBusinessName = document.getElementById("reports-business-name");
+    elements.reportsBusinessPhone = document.getElementById("reports-business-phone");
+    elements.reportsBusinessAddress = document.getElementById("reports-business-address");
+    elements.reportsPeriodTitle = document.getElementById("reports-period-title");
+    elements.reportsGenerated = document.getElementById("reports-generated");
+    elements.reportsRevenue = document.getElementById("reports-revenue");
+    elements.reportsCount = document.getElementById("reports-count");
+    elements.reportsCash = document.getElementById("reports-cash");
+    elements.reportsMomo = document.getElementById("reports-momo");
+    elements.reportsBestSeller = document.getElementById("reports-best-seller");
+    elements.reportsProducts = document.getElementById("reports-products");
+    elements.reportsLowStock = document.getElementById("reports-low-stock");
 
     // Product form modal
     elements.productModal = document.getElementById("product-modal");
@@ -388,12 +416,15 @@
     elements.manageView.hidden = !isManage;
     elements.usersView.hidden = key !== "users";
     elements.settingsView.hidden = key !== "settings";
+    elements.reportsView.hidden = key !== "reports";
     if (isManage) {
       renderManageScreen(key);
     } else if (key === "users") {
       renderUsers();
     } else if (key === "settings") {
       renderSettings();
+    } else if (key === "reports") {
+      renderReports();
     }
     renderNav();
   }
@@ -450,7 +481,7 @@
       showSection("pos");
       return;
     }
-    if (item.key === "products" || item.key === "inventory" || item.key === "users" || item.key === "settings") {
+    if (item.key === "products" || item.key === "inventory" || item.key === "users" || item.key === "settings" || item.key === "reports") {
       // Nav is already role-filtered; this guard is defence in depth.
       if (currentUser && auth.canAccess(currentUser.role, item.key)) {
         showSection(item.key);
@@ -459,7 +490,7 @@
       }
       return;
     }
-    // Sales History and Reports are accessible per role but not built yet.
+    // Sales History is accessible per role but not built yet.
     showToast(item.label + " is coming in a later feature.");
   }
 
@@ -1622,6 +1653,178 @@
     reader.readAsDataURL(file);
   }
 
+  // --- Daily reports ------------------------------------------------------
+
+  var currentReportSummary = null;
+  var currentReportPeriodTitle = "";
+
+  function bindReportEvents() {
+    var todayDisplay = reports.formatDateKey(reports.todayKey());
+    elements.reportsFromDate.value = todayDisplay;
+    elements.reportsToDate.value = todayDisplay;
+    elements.reportsFromNative.value = reports.todayKey();
+    elements.reportsToNative.value = reports.todayKey();
+    elements.reportsApply.addEventListener("click", renderReports);
+    elements.reportsPrint.addEventListener("click", function () {
+      printReport(elements.reportsPrintSize.value);
+    });
+    elements.reportsExportPdf.addEventListener("click", function () {
+      downloadReportPdf();
+    });
+    bindReportCalendar(elements.reportsFromCalendar, elements.reportsFromNative, elements.reportsFromDate);
+    bindReportCalendar(elements.reportsToCalendar, elements.reportsToNative, elements.reportsToDate);
+    elements.reportsFromDate.addEventListener("keydown", applyReportDatesOnEnter);
+    elements.reportsToDate.addEventListener("keydown", applyReportDatesOnEnter);
+    window.addEventListener("afterprint", clearReportPrintMode);
+  }
+
+  function bindReportCalendar(button, nativeInput, displayInput) {
+    button.addEventListener("click", function () {
+      var currentKey = reports.displayDateToKey(displayInput.value);
+      if (currentKey) { nativeInput.value = currentKey; }
+      if (typeof nativeInput.showPicker === "function") {
+        nativeInput.showPicker();
+      } else {
+        nativeInput.click();
+      }
+    });
+    nativeInput.addEventListener("change", function () {
+      if (nativeInput.value) {
+        displayInput.value = reports.formatDateKey(nativeInput.value);
+        renderReports();
+      }
+    });
+  }
+
+  function applyReportDatesOnEnter(event) {
+    if (event.key === "Enter") { renderReports(); }
+  }
+
+  function renderReports() {
+    if (!currentUser || !auth.canAccess(currentUser.role, "reports")) {
+      showToast("You do not have access to Reports.");
+      showSection("pos");
+      return;
+    }
+    var fromDateKey = reports.displayDateToKey(elements.reportsFromDate.value);
+    var toDateKey = reports.displayDateToKey(elements.reportsToDate.value);
+    if (!fromDateKey || !toDateKey) {
+      elements.reportsError.textContent = "Enter both dates as DD-MM-YYYY.";
+      return false;
+    }
+    if (fromDateKey > toDateKey) {
+      elements.reportsError.textContent = "From date cannot be later than To date.";
+      return false;
+    }
+    elements.reportsError.textContent = "";
+    var summary = reports.getSalesSummary(fromDateKey, toDateKey);
+    var fromDisplay = reports.formatDateKey(fromDateKey);
+    var toDisplay = reports.formatDateKey(toDateKey);
+    elements.reportsFromDate.value = fromDisplay;
+    elements.reportsToDate.value = toDisplay;
+    elements.reportsFromNative.value = fromDateKey;
+    elements.reportsToNative.value = toDateKey;
+    elements.reportsPeriodTitle.textContent = fromDateKey === toDateKey
+      ? "Daily Report — " + fromDisplay
+      : "Report — " + fromDisplay + " to " + toDisplay;
+    elements.reportsGenerated.textContent = "Generated: " + reports.formatDateTime(new Date());
+    currentReportSummary = summary;
+    currentReportPeriodTitle = elements.reportsPeriodTitle.textContent;
+    renderReportBranding();
+
+    elements.reportsRevenue.textContent = money.formatMoney(summary.totalRevenue);
+    elements.reportsCount.textContent = String(summary.transactionCount);
+    elements.reportsCash.textContent = money.formatMoney(summary.cashTotal);
+    elements.reportsMomo.textContent = money.formatMoney(summary.momoTotal);
+    elements.reportsBestSeller.textContent = summary.bestSeller
+      ? summary.bestSeller.name + " · " + summary.bestSeller.quantity + " sold"
+      : "No items sold.";
+
+    renderReportRows(elements.reportsProducts, summary.productsSold, function (product) {
+      return { label: product.name, value: product.quantity + " sold" };
+    }, "No products or meals were sold in this period.");
+
+    renderReportRows(elements.reportsLowStock, summary.lowStockProducts, function (product) {
+      return {
+        label: product.name || "Unnamed product",
+        value: "Stock " + product.stockQuantity + " · Low at " + product.lowStockLevel
+      };
+    }, "No products are currently low in stock.");
+    return true;
+  }
+
+  function renderReportBranding() {
+    var settings = state.settings || {};
+    renderLogo(elements.reportsPrintLogo, settings);
+    elements.reportsBusinessName.textContent = settings.businessName || "Business Report";
+    setReportBusinessDetail(elements.reportsBusinessPhone, "Telephone", settings.phone);
+    setReportBusinessDetail(elements.reportsBusinessAddress, "Address", settings.address);
+  }
+
+  function setReportBusinessDetail(element, label, value) {
+    element.hidden = !value;
+    element.textContent = value ? label + ": " + value : "";
+  }
+
+  function printReport(format) {
+    if (!renderReports()) { return; }
+    document.body.classList.add("printing-report");
+    document.body.classList.add(format === "58mm" ? "report-print-58" :
+      format === "a4" ? "report-print-a4" : "report-print-80");
+    window.print();
+  }
+
+  function downloadReportPdf() {
+    if (!renderReports() || !currentReportSummary) { return; }
+    var blob = reportPdf.createPdf(
+      currentReportSummary,
+      state.settings || {},
+      currentReportPeriodTitle,
+      elements.reportsGenerated.textContent,
+      money.formatMoney
+    );
+    var downloadUrl = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = "sales-report-" + currentReportSummary.fromDateKey + "-to-" + currentReportSummary.toDateKey + ".pdf";
+    link.hidden = true;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function () { URL.revokeObjectURL(downloadUrl); }, 1000);
+    showToast("PDF report downloaded.");
+  }
+
+  function clearReportPrintMode() {
+    document.body.classList.remove("printing-report", "report-print-58", "report-print-80", "report-print-a4");
+  }
+
+  function renderReportRows(container, items, mapItem, emptyMessage) {
+    container.innerHTML = "";
+    if (!items.length) {
+      var empty = document.createElement("p");
+      empty.className = "report-panel__empty";
+      empty.textContent = emptyMessage;
+      container.appendChild(empty);
+      return;
+    }
+    var list = document.createElement("ul");
+    list.className = "report-list";
+    for (var i = 0; i < items.length; i++) {
+      var content = mapItem(items[i]);
+      var row = document.createElement("li");
+      row.className = "report-list__row";
+      var label = document.createElement("span");
+      label.textContent = content.label;
+      var value = document.createElement("strong");
+      value.textContent = content.value;
+      row.appendChild(label);
+      row.appendChild(value);
+      list.appendChild(row);
+    }
+    container.appendChild(list);
+  }
+
   // --- Admin users and settings ------------------------------------------
 
   var editingUserId = null;
@@ -2169,6 +2372,7 @@
     bindModalEvents();
     bindManageEvents();
     bindAdminEvents();
+    bindReportEvents();
     bindCheckoutEvents();
 
     // POS content can be rendered while hidden; it is revealed after login.

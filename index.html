@@ -164,6 +164,45 @@
         <div class="settings-form__wide"><button class="btn btn--primary" id="settings-save" type="submit">Save settings</button></div>
       </form>
     </section>
+
+    <section class="manage reports" id="reports-view" hidden aria-labelledby="reports-title">
+      <div class="manage__bar">
+        <h2 class="section-title" id="reports-title">Daily Reports</h2>
+        <div class="page-header__actions reports__page-actions">
+          <label class="reports__print-format"><span>Print size</span><select class="field__input" id="reports-print-size"><option value="80mm">80 mm thermal (default)</option><option value="58mm">58 mm thermal</option><option value="a4">A4 paper</option></select></label>
+          <button class="btn btn--primary" id="reports-print" type="button">Print report</button>
+          <button class="btn btn--secondary" id="reports-export-pdf" type="button" title="Download this report as a PDF file">Export PDF</button>
+          <button class="btn btn--secondary page-close" type="button">Close</button>
+        </div>
+      </div>
+      <article class="reports__print-area" id="reports-print-area">
+        <header class="reports__print-header">
+          <span class="brand-logo brand-logo--lg reports__print-logo" id="reports-print-logo" aria-hidden="true"></span>
+          <h2 class="reports__business-name" id="reports-business-name"></h2>
+          <p class="reports__business-detail" id="reports-business-phone" hidden></p>
+          <p class="reports__business-detail" id="reports-business-address" hidden></p>
+          <h3 class="reports__period-title" id="reports-period-title">Daily Report</h3>
+          <p class="reports__generated" id="reports-generated"></p>
+        </header>
+        <div class="reports__filters">
+          <label class="field reports__date-field"><span class="field__label">From date</span><span class="date-picker"><input class="field__input date-picker__display" id="reports-from-date" type="text" inputmode="numeric" placeholder="DD-MM-YYYY" maxlength="10" /><button class="date-picker__button" id="reports-from-calendar" type="button" aria-label="Choose From date">&#128197;</button><input class="visually-hidden" id="reports-from-native" type="date" tabindex="-1" aria-hidden="true" /></span></label>
+          <label class="field reports__date-field"><span class="field__label">To date</span><span class="date-picker"><input class="field__input date-picker__display" id="reports-to-date" type="text" inputmode="numeric" placeholder="DD-MM-YYYY" maxlength="10" /><button class="date-picker__button" id="reports-to-calendar" type="button" aria-label="Choose To date">&#128197;</button><input class="visually-hidden" id="reports-to-native" type="date" tabindex="-1" aria-hidden="true" /></span></label>
+          <button class="btn btn--accent" id="reports-apply" type="button">Apply dates</button>
+        </div>
+        <p class="modal__error reports__error" id="reports-error" role="alert"></p>
+        <div class="reports__metrics" aria-label="Sales totals">
+          <article class="report-card"><span class="report-card__label">Total sales revenue</span><strong class="report-card__value" id="reports-revenue">GH₵0.00</strong></article>
+          <article class="report-card"><span class="report-card__label">Completed transactions</span><strong class="report-card__value" id="reports-count">0</strong></article>
+          <article class="report-card"><span class="report-card__label">Cash sales</span><strong class="report-card__value" id="reports-cash">GH₵0.00</strong></article>
+          <article class="report-card"><span class="report-card__label">MoMo sales</span><strong class="report-card__value" id="reports-momo">GH₵0.00</strong></article>
+        </div>
+        <div class="reports__details">
+          <section class="report-panel" aria-labelledby="best-seller-title"><h3 class="report-panel__title" id="best-seller-title">Best-selling item</h3><p class="report-panel__empty" id="reports-best-seller">No items sold.</p></section>
+          <section class="report-panel" aria-labelledby="products-sold-title"><h3 class="report-panel__title" id="products-sold-title">Products and meals sold</h3><div id="reports-products"></div></section>
+          <section class="report-panel" aria-labelledby="low-stock-title"><h3 class="report-panel__title" id="low-stock-title">Low-stock products</h3><div id="reports-low-stock"></div></section>
+        </div>
+      </article>
+    </section>
   </div>
 
   <div class="modal" id="user-modal" hidden role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
@@ -419,6 +458,8 @@
   <script src="js/utils/validation.js"></script>
   <script src="js/data/seed-data.js"></script>
   <script src="js/services/storage-service.js"></script>
+  <script src="js/services/reports-service.js"></script>
+  <script src="js/services/report-pdf-service.js"></script>
   <script src="js/services/auth-service.js"></script>
   <script src="js/app.js"></script>
 </body>
