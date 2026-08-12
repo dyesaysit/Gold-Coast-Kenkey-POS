@@ -1572,13 +1572,30 @@ button.modal__close:hover {
    items viewport. These preview-only dimensions do not affect thermal print. */
 @media screen {
   .receipt-modal .receipt__brand {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--space-md);
+    row-gap: 2px;
     padding: var(--space-md) var(--space-md) var(--space-sm);
+    text-align: left;
   }
 
   .receipt-modal .receipt__logo {
+    grid-column: 1;
+    grid-row: 1 / span 8;
     width: 64px;
     height: 64px;
-    margin-bottom: var(--space-xs);
+    margin: 0;
+  }
+
+  .receipt-modal .receipt__business,
+  .receipt-modal .receipt__contact,
+  .receipt-modal .receipt__extra-info {
+    grid-column: 2;
+    max-width: none;
+    margin: 0;
+    text-align: left;
   }
 
   .receipt-modal .receipt__summary {
@@ -1587,11 +1604,36 @@ button.modal__close:hover {
   }
 
   .receipt-modal .receipt__meta {
+    grid-template-columns: 1fr;
     padding: var(--space-sm);
+  }
+
+  .receipt-modal .receipt__meta-line {
+    min-width: 0;
+  }
+
+  .receipt-modal .receipt__meta-line strong {
+    overflow-wrap: anywhere;
   }
 
   .receipt-modal .receipt__thanks {
     padding: 0 var(--space-md) var(--space-sm);
+  }
+}
+
+@media screen and (min-width: 520px) {
+  .receipt-modal .receipt__meta {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-md);
+  }
+
+  .receipt-modal .receipt__meta-line {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .receipt-modal .receipt__meta-line strong {
+    text-align: left;
   }
 }
 
