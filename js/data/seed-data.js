@@ -60,6 +60,9 @@
       currencyCode: "GHS",
       currencySymbol: "GH₵",
       receiptPrefix: "GCK",
+      receiptFooterNote: "Thank you for choosing Gold Coast Kenkey!",
+      receiptExtraInfo: "",
+      receiptPaperWidth: "80mm",
       dataVersion: 2
     },
 

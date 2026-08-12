@@ -7,6 +7,11 @@
 
 /* --- Tablet: 640px and up ------------------------------------------------ */
 @media (min-width: 640px) {
+  .app-header .brand-logo {
+    width: 72px;
+    height: 72px;
+  }
+
   .product-grid {
     grid-template-columns: repeat(3, 1fr); /* three tiles per row */
   }
