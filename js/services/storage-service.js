@@ -23,6 +23,20 @@
     session: "gckpos.session"
   };
 
+  var lastWriteFailure = null;
+
+  function classifyWriteFailure(error) {
+    var name = error && error.name ? String(error.name) : "";
+    var code = error && error.code;
+    var isCapacity = name === "QuotaExceededError" || name === "NS_ERROR_DOM_QUOTA_REACHED" || code === 22 || code === 1014;
+    return {
+      code: isCapacity ? "storage_capacity" : "storage_write_failed",
+      message: isCapacity
+        ? "Browser storage is full. Free some browser storage, then try the sale again."
+        : "The sale could not be saved. Check browser storage access, then try again."
+    };
+  }
+
   /**
    * Read and parse a stored value. Returns the fallback when the key is missing
    * OR when the stored text is corrupt, so a bad value never crashes the app
@@ -44,11 +58,32 @@
   }
 
   function writeJson(key, value) {
+    lastWriteFailure = null;
     try {
       localStorage.setItem(key, JSON.stringify(value));
       return true;
     } catch (error) {
+      lastWriteFailure = classifyWriteFailure(error);
       console.error("Could not save " + key + ".", error);
+      return false;
+    }
+  }
+
+  function getRawValue(key) {
+    try {
+      return { readable: true, value: localStorage.getItem(key) };
+    } catch (error) {
+      return { readable: false, value: null };
+    }
+  }
+
+  function restoreRawValue(key, snapshot) {
+    try {
+      if (snapshot.value === null) { localStorage.removeItem(key); }
+      else { localStorage.setItem(key, snapshot.value); }
+      return true;
+    } catch (error) {
+      console.error("Could not restore " + key + " after a failed sale.", error);
       return false;
     }
   }
@@ -150,15 +185,24 @@
     return todayPrefix + pad(todayCount + 1, 4);
   }
 
-  /**
-   * Complete a sale as one transaction (DATABASE-DESIGN.md section 18): reduce
-   * stock for inventory-tracked sale items, then persist inventory, the sale,
-   * and clear the cart. All updated objects are prepared before writing so a
-   * failure does not leave partially updated data. Stock never goes negative.
-   * Stock is only ever reduced here - i.e. only on a completed sale.
-   */
+  /** Complete a sale with compensating rollback across the three storage keys. */
   function completeSale(sale) {
     var inventory = getInventoryProducts();
+    var sales = getSales();
+    var previous = {};
+    previous[KEYS.inventoryProducts] = getRawValue(KEYS.inventoryProducts);
+    previous[KEYS.sales] = getRawValue(KEYS.sales);
+    previous[KEYS.currentCart] = getRawValue(KEYS.currentCart);
+    if (!previous[KEYS.inventoryProducts].readable || !previous[KEYS.sales].readable || !previous[KEYS.currentCart].readable) {
+      return {
+        success: false,
+        code: "storage_read_failed",
+        stage: "prepare",
+        rollbackSuccessful: true,
+        message: "The current sale data could not be read safely. Reload the app and try again."
+      };
+    }
+
     var indexById = {};
     for (var i = 0; i < inventory.length; i++) {
       indexById[inventory[i].id] = i;
@@ -177,10 +221,77 @@
       }
     }
 
-    var okInventory = saveInventoryProducts(inventory);
-    var okSale = saveSale(sale);
-    var okCart = clearCurrentCart();
-    return okInventory && okSale && okCart;
+    var updatedSales = sales.concat([sale]);
+    var writes = [
+      { key: KEYS.inventoryProducts, value: inventory, stage: "inventory" },
+      { key: KEYS.sales, value: updatedSales, stage: "sale" },
+      { key: KEYS.currentCart, value: [], stage: "cart" }
+    ];
+
+    // Serialize every new value before the first write.
+    try {
+      for (var k = 0; k < writes.length; k++) { JSON.stringify(writes[k].value); }
+    } catch (error) {
+      return {
+        success: false,
+        code: "storage_write_failed",
+        stage: "prepare",
+        rollbackSuccessful: true,
+        message: "The sale contains data that cannot be saved. Review the cart and try again."
+      };
+    }
+
+    for (var w = 0; w < writes.length; w++) {
+      if (!writeJson(writes[w].key, writes[w].value)) {
+        var rollbackSuccessful = true;
+        for (var r = 0; r < writes.length; r++) {
+          if (!restoreRawValue(writes[r].key, previous[writes[r].key])) {
+            rollbackSuccessful = false;
+          }
+        }
+        var failure = lastWriteFailure || classifyWriteFailure(null);
+        return {
+          success: false,
+          code: rollbackSuccessful ? failure.code : "storage_rollback_failed",
+          stage: writes[w].stage,
+          rollbackSuccessful: rollbackSuccessful,
+          message: rollbackSuccessful
+            ? failure.message
+            : "The sale was not saved safely. Stop checkout and reload the app before trying again."
+        };
+      }
+    }
+
+    return { success: true, code: "", stage: "complete", rollbackSuccessful: true, message: "" };
+  }
+
+  function createReceiptSettingsSnapshot(settings) {
+    settings = settings || {};
+    return {
+      businessName: settings.businessName || "",
+      shortName: settings.shortName || "",
+      logo: settings.logo || "",
+      phone: settings.phone || "",
+      address: settings.address || "",
+      receiptFooter: settings.receiptFooterNote || "",
+      extraReceiptInfo: settings.receiptExtraInfo || "",
+      receiptPaperWidth: settings.receiptPaperWidth === "58mm" ? "58mm" : "80mm"
+    };
+  }
+
+  function getReceiptSettings(sale, currentSettings) {
+    var snapshot = sale && sale.receiptSettings;
+    if (!snapshot) { return currentSettings || {}; }
+    return {
+      businessName: snapshot.businessName || "",
+      shortName: snapshot.shortName || "",
+      logo: snapshot.logo || "",
+      phone: snapshot.phone || "",
+      address: snapshot.address || "",
+      receiptFooterNote: snapshot.receiptFooter || "",
+      receiptExtraInfo: snapshot.extraReceiptInfo || "",
+      receiptPaperWidth: snapshot.receiptPaperWidth === "58mm" ? "58mm" : "80mm"
+    };
   }
 
   // --- Current cart --------------------------------------------------------
@@ -294,6 +405,8 @@
     saveSale: saveSale,
     generateReceiptNumber: generateReceiptNumber,
     completeSale: completeSale,
+    createReceiptSettingsSnapshot: createReceiptSettingsSnapshot,
+    getReceiptSettings: getReceiptSettings,
     getCurrentCart: getCurrentCart,
     saveCurrentCart: saveCurrentCart,
     clearCurrentCart: clearCurrentCart,
