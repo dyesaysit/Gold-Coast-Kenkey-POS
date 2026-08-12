@@ -1550,11 +1550,73 @@ button.modal__close:hover {
 
 .receipt-modal__panel {
   height: min(92vh, 820px);
+  min-height: 0;
 }
 
 .receipt-modal__body {
+  flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
+}
+
+.receipt-modal__panel > .modal__header,
+.receipt-modal__panel > .modal__footer,
+.receipt__brand,
+.receipt__meta,
+.receipt__summary,
+.receipt__thanks {
+  flex: 0 0 auto;
+}
+
+/* Keep the non-scrolling receipt regions compact enough to leave a useful
+   items viewport. These preview-only dimensions do not affect thermal print. */
+@media screen {
+  .receipt-modal .receipt__brand {
+    padding: var(--space-md) var(--space-md) var(--space-sm);
+  }
+
+  .receipt-modal .receipt__logo {
+    width: 64px;
+    height: 64px;
+    margin-bottom: var(--space-xs);
+  }
+
+  .receipt-modal .receipt__summary {
+    margin: var(--space-sm);
+    padding: var(--space-sm);
+  }
+
+  .receipt-modal .receipt__meta {
+    padding: var(--space-sm);
+  }
+
+  .receipt-modal .receipt__thanks {
+    padding: 0 var(--space-md) var(--space-sm);
+  }
+}
+
+@media screen and (max-width: 639px) {
+  .receipt-modal .receipt__brand {
+    padding: var(--space-sm) var(--space-sm) var(--space-xs);
+  }
+
+  .receipt-modal .receipt__logo {
+    width: 48px;
+    height: 48px;
+  }
+
+  .receipt-modal .receipt__meta,
+  .receipt-modal .receipt__summary {
+    padding: var(--space-xs);
+  }
+
+  .receipt-modal .receipt__summary {
+    margin: var(--space-xs);
+  }
+
+  .receipt-modal .receipt__thanks {
+    padding: 0 var(--space-sm) var(--space-xs);
+  }
 }
 
 .receipt__brand {
@@ -1623,7 +1685,7 @@ button.modal__close:hover {
   padding: 0 var(--space-md);
   border-bottom: 1px dashed var(--color-border);
   flex: 1 1 auto;
-  min-height: 110px;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
