@@ -88,6 +88,13 @@ body {
   object-fit: contain;
 }
 
+/* Give the main header logo more presence without changing receipt/login marks. */
+.app-header .brand-logo {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-lg);
+}
+
 .brand-logo--lg {
   width: 64px;
   height: 64px;
@@ -885,10 +892,19 @@ body {
 
 /* --- Product & inventory management screen ------------------------------ */
 .manage {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: var(--space-md);
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+}
+
+.page-header__actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
 }
 
 .manage__bar {
@@ -954,6 +970,55 @@ body {
   color: var(--color-text-muted);
 }
 
+.settings-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-md);
+  max-width: 900px;
+  width: 100%;
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+}
+
+.settings-logo-preview {
+  height: 140px;
+}
+
+.settings-logo-preview .brand-logo {
+  margin: 0;
+}
+
+@media (min-width: 640px) {
+  .settings-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-form__wide {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 480px) {
+  .manage-row {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .manage-row .btn {
+    width: 100%;
+  }
+
+  .page-header__actions {
+    width: 100%;
+  }
+
+  .page-header__actions .btn {
+    flex: 1;
+  }
+}
+
 /* --- Product form fields ------------------------------------------------ */
 .field {
   display: flex;
@@ -980,6 +1045,13 @@ body {
 .field__input:focus-visible {
   outline: 3px solid var(--color-accent);
   outline-offset: 2px;
+}
+
+.field__input--textarea {
+  min-height: 88px;
+  padding-top: var(--space-sm);
+  padding-bottom: var(--space-sm);
+  resize: vertical;
 }
 
 .field--check {
@@ -1088,6 +1160,38 @@ body {
 .receipt {
   font-size: var(--font-body);
   color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background-color: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.receipt-modal__panel {
+  height: min(92vh, 820px);
+}
+
+.receipt-modal__body {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.receipt__brand {
+  padding: var(--space-lg) var(--space-md) var(--space-md);
+  text-align: center;
+  background-color: var(--color-background);
+  border-bottom: 3px solid var(--color-accent);
+}
+
+.receipt__logo {
+  margin: 0 auto var(--space-sm);
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-lg);
 }
 
 .receipt__business {
@@ -1097,23 +1201,62 @@ body {
   text-align: center;
 }
 
-.receipt__meta {
-  margin: var(--space-xs) 0 var(--space-md);
-  text-align: center;
+.receipt__contact {
+  margin: 2px 0 0;
   color: var(--color-text-muted);
   font-size: var(--font-small);
 }
 
+.receipt__contact strong {
+  color: var(--color-text);
+}
+
+.receipt__extra-info {
+  max-width: 480px;
+  margin: var(--space-sm) auto 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-small);
+  white-space: pre-line;
+}
+
+.receipt__meta {
+  margin: 0;
+  padding: var(--space-md);
+  color: var(--color-text-muted);
+  font-size: var(--font-small);
+  border-bottom: 1px dashed var(--color-border);
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.receipt__meta-line {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.receipt__meta-line strong {
+  color: var(--color-text);
+  text-align: right;
+}
+
 .receipt__items {
   list-style: none;
-  margin: 0 0 var(--space-md);
-  padding: 0;
-  border-top: 1px dashed var(--color-border);
+  margin: 0;
+  padding: 0 var(--space-md);
   border-bottom: 1px dashed var(--color-border);
+  flex: 1 1 auto;
+  min-height: 110px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .receipt__item {
-  padding: var(--space-sm) 0;
+  padding: var(--space-md) 0;
+}
+
+.receipt__item + .receipt__item {
+  border-top: 1px solid var(--color-border);
 }
 
 .receipt__item-row {
@@ -1134,17 +1277,128 @@ body {
   padding: 2px 0;
 }
 
+.receipt__summary {
+  margin: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  background-color: var(--color-background);
+  display: grid;
+  gap: var(--space-xs);
+  flex: 0 0 auto;
+}
+
 .receipt__line--total {
-  margin-top: var(--space-xs);
-  padding-top: var(--space-sm);
-  border-top: 1px solid var(--color-border);
+  margin-bottom: var(--space-xs);
+  padding-bottom: var(--space-sm);
+  border-bottom: 2px solid var(--color-primary);
   font-size: var(--font-price);
   font-weight: bold;
   color: var(--color-primary-dark);
 }
 
+.receipt__line--change {
+  font-weight: bold;
+  color: var(--color-primary-dark);
+}
+
 .receipt__thanks {
-  margin: var(--space-md) 0 0;
+  margin: 0;
+  padding: 0 var(--space-lg) var(--space-lg);
   text-align: center;
   color: var(--color-text-muted);
+  white-space: pre-line;
+  flex: 0 0 auto;
+}
+
+/* Thermal receipt printing uses the browser/OS printer dialog. This keeps the
+   app independent of printer brands and supports common 58 mm and 80 mm rolls. */
+@media print {
+  @page {
+    size: auto;
+    margin: 3mm;
+  }
+
+  body > *:not(#receipt-modal) {
+    display: none !important;
+  }
+
+  #receipt-modal {
+    position: static;
+    display: block !important;
+    width: auto;
+    height: auto;
+  }
+
+  #receipt-modal .modal__overlay,
+  #receipt-modal .modal__header,
+  #receipt-modal .modal__footer {
+    display: none !important;
+  }
+
+  #receipt-modal .receipt-modal__panel,
+  #receipt-modal .receipt-modal__body {
+    position: static;
+    width: auto;
+    max-width: none;
+    height: auto;
+    max-height: none;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  #receipt-modal .receipt {
+    height: auto;
+    max-height: none;
+    margin: 0 auto;
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+    color: #000;
+    font-size: 10pt;
+  }
+
+  #receipt-modal .receipt--80mm {
+    width: 72mm;
+  }
+
+  #receipt-modal .receipt--58mm {
+    width: 50mm;
+    font-size: 8.5pt;
+  }
+
+  #receipt-modal .receipt__brand,
+  #receipt-modal .receipt__summary {
+    background: transparent;
+  }
+
+  #receipt-modal .receipt__brand {
+    padding-top: 0;
+    border-bottom: 1px solid #000;
+  }
+
+  #receipt-modal .receipt__logo {
+    width: 24mm;
+    height: 24mm;
+  }
+
+  #receipt-modal .receipt__items {
+    min-height: 0;
+    overflow: visible;
+  }
+
+  #receipt-modal .receipt__summary {
+    border: 1px solid #000;
+  }
+
+  #receipt-modal .receipt__business,
+  #receipt-modal .receipt__line--total,
+  #receipt-modal .receipt__line--change,
+  #receipt-modal .receipt__contact strong,
+  #receipt-modal .receipt__meta-line strong {
+    color: #000;
+  }
 }

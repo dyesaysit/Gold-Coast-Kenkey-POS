@@ -308,7 +308,7 @@ Reason:
 
 A sale item can reuse the cart-item structure with all final values included.
 
-## 12. Cashier
+## 12. User or Cashier
 
 Example:
 
@@ -317,11 +317,12 @@ Example:
   id: "cashier-1",
   name: "Omar",
   pin: "1234",
+  role: "cashier",
   active: true
 }
 ```
 
-For a school project, PIN security may be simplified. Do not store real production passwords as plain text.
+Roles are `cashier`, `supervisor`, or `admin`. PINs contain 4–6 digits and must be unique. For a school project, PIN security may be simplified. Do not store real production passwords as plain text.
 
 ## 13. Application Settings
 
@@ -330,9 +331,16 @@ Example:
 ```javascript
 {
   businessName: "Gold Coast Kenkey",
+  shortName: "GCK",
+  logo: "",
+  phone: "",
+  address: "",
   currencyCode: "GHS",
   currencySymbol: "GH₵",
   receiptPrefix: "GCK",
+  receiptFooterNote: "Thank you for choosing Gold Coast Kenkey!",
+  receiptExtraInfo: "",
+  receiptPaperWidth: "80mm",
   dataVersion: 1
 }
 ```

@@ -93,6 +93,7 @@
     elements.receiptClose = document.getElementById("receipt-close");
     elements.receiptContent = document.getElementById("receipt-content");
     elements.receiptDone = document.getElementById("receipt-done");
+    elements.receiptPrint = document.getElementById("receipt-print");
 
     // Meal configuration modal
     elements.mealModal = document.getElementById("meal-modal");
@@ -119,8 +120,43 @@
     elements.manageView = document.getElementById("manage-view");
     elements.manageTitle = document.getElementById("manage-title");
     elements.manageAdd = document.getElementById("manage-add");
+    elements.manageClose = document.getElementById("manage-close");
     elements.manageHint = document.getElementById("manage-hint");
     elements.manageList = document.getElementById("manage-list");
+
+    elements.usersView = document.getElementById("users-view");
+    elements.userList = document.getElementById("user-list");
+    elements.userAdd = document.getElementById("user-add");
+    elements.userModal = document.getElementById("user-modal");
+    elements.userOverlay = document.getElementById("user-overlay");
+    elements.userModalTitle = document.getElementById("user-modal-title");
+    elements.userClose = document.getElementById("user-close");
+    elements.userCancel = document.getElementById("user-cancel");
+    elements.userSave = document.getElementById("user-save");
+    elements.ufName = document.getElementById("uf-name");
+    elements.ufPin = document.getElementById("uf-pin");
+    elements.ufPinNote = document.getElementById("uf-pin-note");
+    elements.ufRole = document.getElementById("uf-role");
+    elements.ufActive = document.getElementById("uf-active");
+    elements.userError = document.getElementById("user-error");
+
+    elements.settingsView = document.getElementById("settings-view");
+    elements.settingsForm = document.getElementById("settings-form");
+    elements.sfBusinessName = document.getElementById("sf-business-name");
+    elements.sfShortName = document.getElementById("sf-short-name");
+    elements.sfLogoPreview = document.getElementById("sf-logo-preview");
+    elements.sfLogoFile = document.getElementById("sf-logo-file");
+    elements.sfLogoChoose = document.getElementById("sf-logo-choose");
+    elements.sfLogoRemove = document.getElementById("sf-logo-remove");
+    elements.sfPhone = document.getElementById("sf-phone");
+    elements.sfAddress = document.getElementById("sf-address");
+    elements.sfCurrencyCode = document.getElementById("sf-currency-code");
+    elements.sfCurrencySymbol = document.getElementById("sf-currency-symbol");
+    elements.sfReceiptPrefix = document.getElementById("sf-receipt-prefix");
+    elements.sfReceiptFooter = document.getElementById("sf-receipt-footer");
+    elements.sfReceiptExtraInfo = document.getElementById("sf-receipt-extra-info");
+    elements.sfReceiptPaper = document.getElementById("sf-receipt-paper");
+    elements.settingsError = document.getElementById("settings-error");
 
     // Product form modal
     elements.productModal = document.getElementById("product-modal");
@@ -188,6 +224,7 @@
     var name = settings.businessName || "";
     elements.businessName.textContent = name;
     elements.loginBusiness.textContent = name;
+    document.title = (name ? name + " · " : "") + "Point of Sale";
     renderLogo(elements.headerLogo, settings);
     renderLogo(elements.loginLogo, settings);
   }
@@ -339,14 +376,24 @@
    * Inventory show the management screen. Other sections are not built yet.
    */
   function showSection(key) {
+    if (!currentUser || !auth.canAccess(currentUser.role, key)) {
+      showToast("You do not have access to that section.");
+      key = "pos";
+    }
     activeNavKey = key;
     var isPos = (key === "pos");
     var isManage = (key === "products" || key === "inventory");
     elements.categoryBar.hidden = !isPos;
     elements.appMain.hidden = !isPos;
     elements.manageView.hidden = !isManage;
+    elements.usersView.hidden = key !== "users";
+    elements.settingsView.hidden = key !== "settings";
     if (isManage) {
       renderManageScreen(key);
+    } else if (key === "users") {
+      renderUsers();
+    } else if (key === "settings") {
+      renderSettings();
     }
     renderNav();
   }
@@ -403,7 +450,7 @@
       showSection("pos");
       return;
     }
-    if (item.key === "products" || item.key === "inventory") {
+    if (item.key === "products" || item.key === "inventory" || item.key === "users" || item.key === "settings") {
       // Nav is already role-filtered; this guard is defence in depth.
       if (currentUser && auth.canAccess(currentUser.role, item.key)) {
         showSection(item.key);
@@ -412,8 +459,7 @@
       }
       return;
     }
-    // Sales History, Reports, Users and Settings are accessible per role but
-    // not built yet.
+    // Sales History and Reports are accessible per role but not built yet.
     showToast(item.label + " is coming in a later feature.");
   }
 
@@ -1202,6 +1248,7 @@
   var formImage = ""; // current image (data URI or path); "" means none
 
   function bindManageEvents() {
+    elements.manageClose.addEventListener("click", closeManagementPage);
     elements.manageAdd.addEventListener("click", function () {
       openProductForm(null);
     });
@@ -1227,6 +1274,14 @@
         closeProductForm();
       }
     });
+  }
+
+  function closeManagementPage() {
+    if (!elements.productModal.hidden) {
+      showToast("Close or cancel the product form first.");
+      return;
+    }
+    showSection("pos");
   }
 
   function canManage() {
@@ -1567,6 +1622,235 @@
     reader.readAsDataURL(file);
   }
 
+  // --- Admin users and settings ------------------------------------------
+
+  var editingUserId = null;
+  var settingsLogo = "";
+
+  function isAdmin() {
+    return !!currentUser && currentUser.role === "admin";
+  }
+
+  function bindAdminEvents() {
+    elements.userAdd.addEventListener("click", function () { openUserForm(null); });
+    elements.userSave.addEventListener("click", saveUserForm);
+    elements.userCancel.addEventListener("click", closeUserForm);
+    elements.userClose.addEventListener("click", closeUserForm);
+    elements.userOverlay.addEventListener("click", closeUserForm);
+    var pageCloseButtons = document.querySelectorAll(".page-close");
+    for (var i = 0; i < pageCloseButtons.length; i++) {
+      pageCloseButtons[i].addEventListener("click", function () { showSection("pos"); });
+    }
+    elements.settingsForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      saveSettingsForm();
+    });
+    elements.sfLogoChoose.addEventListener("click", function () { elements.sfLogoFile.click(); });
+    elements.sfLogoRemove.addEventListener("click", function () { setSettingsLogo(""); });
+    elements.sfShortName.addEventListener("input", function () {
+      if (!settingsLogo) { setSettingsLogo(""); }
+    });
+    elements.sfLogoFile.addEventListener("change", function (event) {
+      var file = event.target.files && event.target.files[0];
+      event.target.value = "";
+      handleSettingsLogo(file);
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !elements.userModal.hidden) { closeUserForm(); }
+    });
+  }
+
+  function renderUsers() {
+    if (!isAdmin()) {
+      showSection("pos");
+      return;
+    }
+    var users = storage.getCashiers();
+    elements.userList.innerHTML = "";
+    for (var i = 0; i < users.length; i++) {
+      elements.userList.appendChild(buildUserRow(users[i]));
+    }
+  }
+
+  function buildUserRow(user) {
+    var row = document.createElement("div");
+    row.className = "manage-row";
+    var info = document.createElement("div");
+    info.className = "manage-row__info";
+    var name = document.createElement("div");
+    name.className = "manage-row__name";
+    name.textContent = user.name;
+    var meta = document.createElement("div");
+    meta.className = "manage-row__meta";
+    meta.textContent = titleCase(user.role) + " · PIN •••• · " + (user.active ? "Active" : "Inactive");
+    info.appendChild(name);
+    info.appendChild(meta);
+    var edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "btn btn--secondary";
+    edit.textContent = "Edit";
+    edit.addEventListener("click", function () { openUserForm(user); });
+    row.appendChild(info);
+    row.appendChild(edit);
+    return row;
+  }
+
+  function titleCase(value) {
+    value = String(value || "");
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  }
+
+  function openUserForm(user) {
+    if (!isAdmin()) { showToast("Admin access is required."); return; }
+    editingUserId = user ? user.id : null;
+    elements.userModalTitle.textContent = user ? "Edit user" : "Add user";
+    elements.ufName.value = user ? user.name : "";
+    elements.ufPin.value = "";
+    elements.ufPinNote.textContent = user ? "Leave blank to keep the current PIN." : "Enter 4–6 digits.";
+    elements.ufRole.value = user ? user.role : "cashier";
+    elements.ufActive.checked = user ? user.active !== false : true;
+    elements.userError.textContent = "";
+    elements.userModal.hidden = false;
+    elements.ufName.focus();
+  }
+
+  function closeUserForm() {
+    elements.userModal.hidden = true;
+    editingUserId = null;
+  }
+
+  function saveUserForm() {
+    if (!isAdmin()) { showToast("Admin access is required."); return; }
+    var users = storage.getCashiers();
+    var existing = null;
+    for (var i = 0; i < users.length; i++) {
+      if (users[i].id === editingUserId) { existing = users[i]; break; }
+    }
+    var name = elements.ufName.value.trim();
+    var pin = elements.ufPin.value.trim();
+    if (!name) { elements.userError.textContent = "Enter a name."; return; }
+    if ((!existing || pin) && !/^[0-9]{4,6}$/.test(pin)) {
+      elements.userError.textContent = "PIN must contain 4–6 digits.";
+      return;
+    }
+    var finalPin = pin || (existing && String(existing.pin));
+    for (var j = 0; j < users.length; j++) {
+      if (users[j].id !== editingUserId && String(users[j].pin) === finalPin) {
+        elements.userError.textContent = "That PIN is already in use.";
+        return;
+      }
+    }
+    if (existing && existing.id === currentUser.id && currentUser.role === "admin" && !elements.ufActive.checked) {
+      elements.userError.textContent = "The currently logged-in admin cannot be deactivated.";
+      return;
+    }
+    if (existing && existing.id === currentUser.id && elements.ufRole.value !== "admin") {
+      elements.userError.textContent = "The currently logged-in admin cannot change their own role.";
+      return;
+    }
+    var user = {
+      id: editingUserId || createId("user"),
+      name: name,
+      pin: finalPin,
+      role: elements.ufRole.value,
+      active: elements.ufActive.checked
+    };
+    if (!storage.saveCashier(user)) { elements.userError.textContent = "Could not save the user."; return; }
+    closeUserForm();
+    renderUsers();
+    showToast("User saved.");
+  }
+
+  function renderSettings() {
+    if (!isAdmin()) { showSection("pos"); return; }
+    var settings = storage.getSettings() || {};
+    elements.sfBusinessName.value = settings.businessName || "";
+    elements.sfShortName.value = settings.shortName || "";
+    elements.sfPhone.value = settings.phone || "";
+    elements.sfAddress.value = settings.address || "";
+    elements.sfCurrencyCode.value = settings.currencyCode || "";
+    elements.sfCurrencySymbol.value = settings.currencySymbol || "";
+    elements.sfReceiptPrefix.value = settings.receiptPrefix || "";
+    elements.sfReceiptFooter.value = settings.receiptFooterNote || "Thank you!";
+    elements.sfReceiptExtraInfo.value = settings.receiptExtraInfo || "";
+    elements.sfReceiptPaper.value = settings.receiptPaperWidth === "58mm" ? "58mm" : "80mm";
+    elements.settingsError.textContent = "";
+    setSettingsLogo(settings.logo || "");
+  }
+
+  function setSettingsLogo(value) {
+    settingsLogo = value || "";
+    elements.sfLogoPreview.innerHTML = "";
+    if (settingsLogo) {
+      var img = document.createElement("img");
+      img.src = settingsLogo;
+      img.alt = "Business logo preview";
+      elements.sfLogoPreview.appendChild(img);
+      elements.sfLogoChoose.textContent = "Replace logo";
+      elements.sfLogoRemove.hidden = false;
+    } else {
+      var fallback = document.createElement("span");
+      fallback.className = "brand-logo brand-logo--lg";
+      fallback.textContent = elements.sfShortName.value.trim() || "Logo";
+      elements.sfLogoPreview.appendChild(fallback);
+      elements.sfLogoChoose.textContent = "Choose logo";
+      elements.sfLogoRemove.hidden = true;
+    }
+  }
+
+  function handleSettingsLogo(file) {
+    if (!file) { return; }
+    if (ALLOWED_IMAGE_TYPES.indexOf(file.type) === -1 || file.size > MAX_IMAGE_BYTES) {
+      elements.settingsError.textContent = "Choose a JPG, PNG, WebP or GIF up to 5 MB.";
+      return;
+    }
+    compressImage(file, function (error, dataUrl) {
+      if (error) { elements.settingsError.textContent = "Could not read that image."; return; }
+      elements.settingsError.textContent = "";
+      setSettingsLogo(dataUrl);
+    });
+  }
+
+  function saveSettingsForm() {
+    if (!isAdmin()) { showToast("Admin access is required."); return; }
+    var businessName = elements.sfBusinessName.value.trim();
+    var shortName = elements.sfShortName.value.trim();
+    var currencyCode = elements.sfCurrencyCode.value.trim().toUpperCase();
+    var currencySymbol = elements.sfCurrencySymbol.value.trim();
+    var receiptPrefix = elements.sfReceiptPrefix.value.trim().toUpperCase();
+    if (!businessName || !shortName || !currencyCode || !currencySymbol || !receiptPrefix) {
+      elements.settingsError.textContent = "Complete all required business and currency fields.";
+      return;
+    }
+    if (!/^[A-Z0-9]+$/.test(receiptPrefix)) {
+      elements.settingsError.textContent = "Receipt prefix may use uppercase letters and numbers only.";
+      return;
+    }
+    var oldSettings = storage.getSettings() || {};
+    var settings = {
+      businessName: businessName,
+      shortName: shortName,
+      logo: settingsLogo,
+      phone: elements.sfPhone.value.trim(),
+      address: elements.sfAddress.value.trim(),
+      currencyCode: currencyCode,
+      currencySymbol: currencySymbol,
+      receiptPrefix: receiptPrefix,
+      receiptFooterNote: elements.sfReceiptFooter.value.trim(),
+      receiptExtraInfo: elements.sfReceiptExtraInfo.value.trim(),
+      receiptPaperWidth: elements.sfReceiptPaper.value === "58mm" ? "58mm" : "80mm",
+      dataVersion: oldSettings.dataVersion || 2
+    };
+    if (!storage.saveSettings(settings)) { elements.settingsError.textContent = "Could not save settings."; return; }
+    state.settings = settings;
+    money.setCurrencySymbol(settings.currencySymbol);
+    applyBranding();
+    renderProducts();
+    renderCart();
+    renderSettings();
+    showToast("Settings saved.");
+  }
+
   // --- Checkout (Cash / MoMo) ---------------------------------------------
 
   var checkoutMethod = "cash"; // "cash" | "momo"
@@ -1582,6 +1866,7 @@
     elements.checkoutClose.addEventListener("click", closeCheckout);
     elements.checkoutOverlay.addEventListener("click", closeCheckout);
     elements.receiptDone.addEventListener("click", closeReceipt);
+    elements.receiptPrint.addEventListener("click", printReceipt);
     elements.receiptClose.addEventListener("click", closeReceipt);
     elements.receiptOverlay.addEventListener("click", closeReceipt);
     document.addEventListener("keydown", function (event) {
@@ -1723,20 +2008,46 @@
     elements.receiptModal.hidden = true;
   }
 
+  function printReceipt() {
+    if (elements.receiptModal.hidden) { return; }
+    window.print();
+  }
+
   function renderReceipt(sale) {
     var settings = state.settings || {};
     var container = elements.receiptContent;
     container.innerHTML = "";
+    container.className = "receipt " + (settings.receiptPaperWidth === "58mm" ? "receipt--58mm" : "receipt--80mm");
+
+    var brand = document.createElement("div");
+    brand.className = "receipt__brand";
+    var logo = document.createElement("span");
+    logo.className = "brand-logo brand-logo--lg receipt__logo";
+    renderLogo(logo, settings);
+    brand.appendChild(logo);
 
     var business = document.createElement("h3");
     business.className = "receipt__business";
     business.textContent = settings.businessName || "Receipt";
-    container.appendChild(business);
+    brand.appendChild(business);
 
-    var meta = document.createElement("p");
+    if (settings.phone) { brand.appendChild(receiptBusinessDetail("Telephone", settings.phone)); }
+    if (settings.address) { brand.appendChild(receiptBusinessDetail("Address", settings.address)); }
+    if (settings.receiptExtraInfo) {
+      var extraInfo = document.createElement("p");
+      extraInfo.className = "receipt__extra-info";
+      extraInfo.textContent = settings.receiptExtraInfo;
+      brand.appendChild(extraInfo);
+    }
+    container.appendChild(brand);
+
+    var meta = document.createElement("div");
     meta.className = "receipt__meta";
-    var cashierLine = (sale.cashier && sale.cashier.name) ? " · Cashier: " + sale.cashier.name : "";
-    meta.textContent = sale.receiptNumber + " · " + formatDateTime(sale.createdAt) + cashierLine;
+    meta.appendChild(receiptMetaLine("Receipt", sale.receiptNumber));
+    meta.appendChild(receiptMetaLine("Date", formatDateTime(sale.createdAt)));
+    if (sale.cashier && sale.cashier.name) {
+      meta.appendChild(receiptMetaLine("Cashier", sale.cashier.name));
+    }
     container.appendChild(meta);
 
     var list = document.createElement("ul");
@@ -1746,20 +2057,45 @@
     }
     container.appendChild(list);
 
-    container.appendChild(receiptLine("Total", money.formatMoney(sale.total), "receipt__line--total"));
-    container.appendChild(receiptLine("Payment method", sale.payment.method === "momo" ? "MoMo" : "Cash"));
+    var summary = document.createElement("section");
+    summary.className = "receipt__summary";
+    summary.appendChild(receiptLine("Total", money.formatMoney(sale.total), "receipt__line--total"));
+    summary.appendChild(receiptLine("Payment method", sale.payment.method === "momo" ? "MoMo" : "Cash"));
 
     if (sale.payment.method === "cash") {
-      container.appendChild(receiptLine("Amount paid", money.formatMoney(sale.payment.amountPaid)));
-      container.appendChild(receiptLine("Change", money.formatMoney(sale.payment.change)));
+      summary.appendChild(receiptLine("Amount paid", money.formatMoney(sale.payment.amountPaid)));
+      summary.appendChild(receiptLine("Change", money.formatMoney(sale.payment.change), "receipt__line--change"));
     } else if (sale.payment.reference) {
-      container.appendChild(receiptLine("MoMo reference", sale.payment.reference));
+      summary.appendChild(receiptLine("MoMo reference", sale.payment.reference));
     }
+    container.appendChild(summary);
 
     var thanks = document.createElement("p");
     thanks.className = "receipt__thanks";
-    thanks.textContent = "Thank you!";
+    thanks.textContent = settings.receiptFooterNote || "Thank you!";
     container.appendChild(thanks);
+  }
+
+  function receiptBusinessDetail(label, value) {
+    var detail = document.createElement("p");
+    detail.className = "receipt__contact";
+    var labelElement = document.createElement("strong");
+    labelElement.textContent = label + ": ";
+    detail.appendChild(labelElement);
+    detail.appendChild(document.createTextNode(value));
+    return detail;
+  }
+
+  function receiptMetaLine(label, value) {
+    var row = document.createElement("div");
+    row.className = "receipt__meta-line";
+    var labelElement = document.createElement("span");
+    labelElement.textContent = label;
+    var valueElement = document.createElement("strong");
+    valueElement.textContent = value;
+    row.appendChild(labelElement);
+    row.appendChild(valueElement);
+    return row;
   }
 
   function buildReceiptItem(item) {
@@ -1810,7 +2146,13 @@
 
   function formatDateTime(iso) {
     try {
-      return new Date(iso).toLocaleString();
+      var date = new Date(iso);
+      if (isNaN(date.getTime())) { return iso; }
+      var day = String(date.getDate()).padStart(2, "0");
+      var month = String(date.getMonth() + 1).padStart(2, "0");
+      var year = date.getFullYear();
+      var time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      return day + "/" + month + "/" + year + " · " + time;
     } catch (error) {
       return iso;
     }
@@ -1826,6 +2168,7 @@
     bindAuthEvents();
     bindModalEvents();
     bindManageEvents();
+    bindAdminEvents();
     bindCheckoutEvents();
 
     // POS content can be rendered while hidden; it is revealed after login.
