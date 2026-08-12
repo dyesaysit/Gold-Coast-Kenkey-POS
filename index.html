@@ -114,11 +114,45 @@
       <div class="manage__bar">
         <h2 class="section-title" id="manage-title">Products</h2>
         <div class="page-header__actions">
+          <label class="reports__print-format" id="inventory-print-format" hidden><span>Print size</span><select class="field__input" id="inventory-print-size"><option value="80mm">80 mm thermal (default)</option><option value="58mm">58 mm thermal</option><option value="a4">A4 paper</option></select></label>
+          <button class="btn btn--primary" id="inventory-print" type="button" hidden>Print inventory report</button>
+          <button class="btn btn--secondary" id="inventory-export-pdf" type="button" hidden>Export PDF</button>
           <button class="btn btn--primary" id="manage-add" type="button">Add product</button>
           <button class="btn btn--secondary" id="manage-close" type="button">Close</button>
         </div>
       </div>
       <p class="manage__hint" id="manage-hint"></p>
+      <article class="inventory-report" id="inventory-report" hidden>
+        <header class="reports__print-header inventory-report__header">
+          <span class="brand-logo brand-logo--lg reports__print-logo" id="inventory-report-logo" aria-hidden="true"></span>
+          <h2 class="reports__business-name" id="inventory-report-business"></h2>
+          <p class="reports__business-detail" id="inventory-report-phone" hidden></p>
+          <p class="reports__business-detail" id="inventory-report-address" hidden></p>
+          <h3 class="reports__period-title">Inventory Report</h3>
+          <p class="reports__generated" id="inventory-report-generated"></p>
+          <p class="reports__generated inventory-report__context" id="inventory-report-context"></p>
+        </header>
+        <div class="reports__metrics" aria-label="Inventory totals">
+          <article class="report-card"><span class="report-card__label">Inventory products</span><strong class="report-card__value" id="inventory-total-products">0</strong></article>
+          <article class="report-card"><span class="report-card__label">Units in stock</span><strong class="report-card__value" id="inventory-total-units">0</strong></article>
+          <article class="report-card"><span class="report-card__label">Low-stock items</span><strong class="report-card__value" id="inventory-low-count">0</strong></article>
+          <article class="report-card"><span class="report-card__label">Out-of-stock items</span><strong class="report-card__value" id="inventory-out-count">0</strong></article>
+        </div>
+        <div class="inventory-report__filters">
+          <label class="field inventory-report__search"><span class="field__label">Search products</span><input class="field__input" id="inventory-report-search" type="search" placeholder="Product name" /></label>
+          <div class="inventory-report__filter-buttons" id="inventory-report-filters" aria-label="Inventory status filter">
+            <button class="btn btn--secondary inventory-filter inventory-filter--active" type="button" data-filter="all">All</button>
+            <button class="btn btn--secondary inventory-filter" type="button" data-filter="low">Low Stock</button>
+            <button class="btn btn--secondary inventory-filter" type="button" data-filter="out">Out of Stock</button>
+          </div>
+        </div>
+        <div class="inventory-table-wrap">
+          <table class="inventory-table">
+            <thead><tr><th>Product name</th><th>Current stock</th><th>Low-stock threshold</th><th>Status</th></tr></thead>
+            <tbody id="inventory-report-table"></tbody>
+          </table>
+        </div>
+      </article>
       <div class="manage__list" id="manage-list"></div>
     </section>
 
@@ -458,6 +492,8 @@
   <script src="js/utils/validation.js"></script>
   <script src="js/data/seed-data.js"></script>
   <script src="js/services/storage-service.js"></script>
+  <script src="js/services/inventory-report-service.js"></script>
+  <script src="js/services/inventory-report-pdf-service.js"></script>
   <script src="js/services/reports-service.js"></script>
   <script src="js/services/report-pdf-service.js"></script>
   <script src="js/services/auth-service.js"></script>

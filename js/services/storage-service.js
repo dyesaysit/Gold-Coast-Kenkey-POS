@@ -208,6 +208,43 @@
   // --- First-launch seeding -----------------------------------------------
 
   /**
+   * Upgrade catalogues saved before the explicit product contract existed.
+   * Collection membership is used only for this one-time migration; all
+   * runtime inventory behaviour continues to depend on trackInventory === true.
+   * Existing explicit true/false choices are never overwritten.
+   */
+  function migrateProductContract() {
+    var inventory = getInventoryProducts();
+    var meals = getMenuItems();
+    var inventoryChanged = false;
+    var mealsChanged = false;
+    var i;
+
+    for (i = 0; i < inventory.length; i++) {
+      if (!Object.prototype.hasOwnProperty.call(inventory[i], "trackInventory")) {
+        inventory[i].trackInventory = true;
+        inventoryChanged = true;
+      }
+      if (!Object.prototype.hasOwnProperty.call(inventory[i], "productType")) {
+        inventory[i].productType = "simple";
+        inventoryChanged = true;
+      }
+    }
+    for (i = 0; i < meals.length; i++) {
+      if (!Object.prototype.hasOwnProperty.call(meals[i], "trackInventory")) {
+        meals[i].trackInventory = false;
+        mealsChanged = true;
+      }
+      if (!Object.prototype.hasOwnProperty.call(meals[i], "productType")) {
+        meals[i].productType = "configured-meal";
+        mealsChanged = true;
+      }
+    }
+    if (inventoryChanged) { saveInventoryProducts(inventory); }
+    if (mealsChanged) { saveMenuItems(meals); }
+  }
+
+  /**
    * Write seed data only for keys that are still empty, so a returning user's
    * saved data is never erased (AGENTS.md rule 8.7). Safe to call on every load.
    */
@@ -228,6 +265,7 @@
       saveInventoryProducts(seed.inventoryProducts);
     }
     if (localStorage.getItem(KEYS.currentCart) === null) { clearCurrentCart(); }
+    migrateProductContract();
   }
 
   global.GCK = global.GCK || {};

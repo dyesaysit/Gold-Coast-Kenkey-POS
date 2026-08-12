@@ -1156,6 +1156,72 @@ button.modal__close:hover {
   text-align: right;
 }
 
+.inventory-report {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-width: 0;
+  margin-bottom: var(--space-lg);
+}
+
+.inventory-report__filters,
+.inventory-report__filter-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-sm);
+}
+
+.inventory-report__search {
+  flex: 1 1 260px;
+  max-width: 440px;
+}
+
+.inventory-filter--active {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.inventory-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.inventory-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.inventory-table th,
+.inventory-table td {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.inventory-table th {
+  color: var(--color-primary-dark);
+  background: var(--color-surface-muted);
+}
+
+.inventory-table tbody tr:last-child td { border-bottom: 0; }
+.inventory-table__empty { color: var(--color-text-muted); text-align: center !important; }
+
+.inventory-status {
+  display: inline-block;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: 999px;
+  font-weight: bold;
+}
+
+.inventory-status--in { color: var(--color-primary-dark); background: #e3f4e8; }
+.inventory-status--low { color: #6b4b00; background: #fff1bf; }
+.inventory-status--out { color: #8f1d1d; background: #fde1e1; }
+
 @media (max-width: 480px) {
   .reports__filters .reports__date-field,
   .reports__filters .btn {
@@ -1177,6 +1243,37 @@ button.modal__close:hover {
   .reports__print-format .field__input {
     width: 100%;
   }
+
+  .inventory-report__search,
+  .inventory-report__filter-buttons,
+  .inventory-report__filter-buttons .btn {
+    width: 100%;
+    max-width: none;
+  }
+
+  .inventory-table-wrap { overflow: visible; }
+  .inventory-table thead { display: none; }
+  .inventory-table,
+  .inventory-table tbody,
+  .inventory-table tr,
+  .inventory-table td { display: block; width: 100%; }
+  .inventory-table tr { padding: var(--space-sm); border-bottom: 1px solid var(--color-border); }
+  .inventory-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    padding: var(--space-xs) 0;
+    border: 0;
+    text-align: right;
+  }
+  .inventory-table td::before {
+    content: attr(data-label);
+    color: var(--color-text-muted);
+    font-weight: bold;
+    text-align: left;
+  }
+  .inventory-table__empty { text-align: left !important; }
+  .inventory-table__empty::before { content: none; }
 }
 
 @media (min-width: 640px) {
@@ -1626,6 +1723,86 @@ button.modal__close:hover {
   #receipt-modal .receipt__meta-line strong {
     color: #000;
   }
+}
+
+/* Inventory printing is isolated from both Sales Reports and receipt modes. */
+@media print {
+  body.printing-inventory { background: #fff !important; }
+  body.printing-inventory > * { display: none !important; }
+  body.printing-inventory > #pos-view {
+    display: block !important;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    background: #fff;
+  }
+  body.printing-inventory #pos-view > * { display: none !important; }
+  body.printing-inventory #manage-view {
+    display: block !important;
+    width: auto;
+    max-width: none;
+    padding: 2mm;
+    overflow: visible;
+    background: #fff;
+  }
+  body.printing-inventory #manage-view > .manage__bar,
+  body.printing-inventory #manage-hint,
+  body.printing-inventory .inventory-report__filters,
+  body.printing-inventory #manage-list,
+  body.printing-inventory #receipt-modal { display: none !important; }
+  body.printing-inventory .inventory-report {
+    display: block !important;
+    color: #000;
+  }
+  body.printing-inventory .reports__print-header,
+  body.printing-inventory .report-card,
+  body.printing-inventory .inventory-table-wrap {
+    background: #fff;
+    border-color: #777;
+    box-shadow: none;
+  }
+  body.printing-inventory .reports__print-header { margin-bottom: 5mm; }
+  body.printing-inventory .reports__print-logo { width: 20mm; height: 20mm; }
+  body.printing-inventory .reports__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 3mm;
+    margin-bottom: 5mm;
+  }
+  body.printing-inventory .inventory-table-wrap { overflow: visible; }
+  body.printing-inventory .inventory-table { display: table; width: 100%; font-size: 9pt; }
+  body.printing-inventory .inventory-table thead { display: table-header-group; }
+  body.printing-inventory .inventory-table tbody { display: table-row-group; }
+  body.printing-inventory .inventory-table tr { display: table-row; break-inside: avoid; }
+  body.printing-inventory .inventory-table th,
+  body.printing-inventory .inventory-table td {
+    display: table-cell;
+    width: auto;
+    padding: 1.5mm;
+    color: #000;
+    border-bottom: 1px solid #999;
+    text-align: left;
+  }
+  body.printing-inventory .inventory-table td::before { content: none; }
+  body.printing-inventory .inventory-status { padding: 0; color: #000; background: transparent; }
+  body.inventory-print-80 #manage-view { width: 76mm; margin: 0 auto; font-size: 8pt; }
+  body.inventory-print-58 #manage-view { width: 54mm; margin: 0 auto; font-size: 7pt; }
+  body.inventory-print-80 .reports__metrics,
+  body.inventory-print-58 .reports__metrics { grid-template-columns: 1fr; gap: 1mm; margin-bottom: 2mm; }
+  body.inventory-print-80 .report-card,
+  body.inventory-print-58 .report-card { padding: 1.5mm; border-radius: 0; }
+  body.inventory-print-80 .report-card__value,
+  body.inventory-print-58 .report-card__value { font-size: 10pt; }
+  body.inventory-print-80 .reports__print-header,
+  body.inventory-print-58 .reports__print-header { padding: 1.5mm 0; border: 0; border-bottom: 1px solid #000; border-radius: 0; }
+  body.inventory-print-80 .reports__print-logo,
+  body.inventory-print-58 .reports__print-logo { width: 16mm; height: 16mm; }
+  body.inventory-print-80 .inventory-table,
+  body.inventory-print-58 .inventory-table { font-size: 7pt; table-layout: fixed; }
+  body.inventory-print-80 .inventory-table th,
+  body.inventory-print-80 .inventory-table td,
+  body.inventory-print-58 .inventory-table th,
+  body.inventory-print-58 .inventory-table td { padding: 1mm 0.5mm; overflow-wrap: anywhere; }
+  body.inventory-print-a4 #manage-view { max-width: 190mm; margin: 0 auto; padding: 10mm; }
 }
 
 /* A4 Reports print mode. Kept separate from the receipt rules above so thermal
