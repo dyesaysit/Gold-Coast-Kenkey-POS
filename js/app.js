@@ -12,8 +12,8 @@
  *   GCK.storage     -> the single storage service
  *   GCK.auth        -> login validation, session, access control
  *
- * Scope note: full meal configuration, checkout, reports, and inventory/user
- * management screens are later features and are intentionally not built here.
+ * Feature screens share the same storage, pricing, validation, and access
+ * services so historical receipts and current catalogue data stay separate.
  */
 (function (global) {
   "use strict";
@@ -27,6 +27,7 @@
   var reportPdf = global.GCK.reportPdf;
   var inventoryReport = global.GCK.inventoryReport;
   var inventoryReportPdf = global.GCK.inventoryReportPdf;
+  var salesHistory = global.GCK.salesHistory;
 
   // In-memory view of catalogue data, loaded once from storage.
   var state = {
@@ -205,6 +206,26 @@
     elements.reportsBestSeller = document.getElementById("reports-best-seller");
     elements.reportsProducts = document.getElementById("reports-products");
     elements.reportsLowStock = document.getElementById("reports-low-stock");
+
+    elements.salesHistoryView = document.getElementById("sales-history-view");
+    elements.salesHistorySearch = document.getElementById("sales-history-search");
+    elements.salesHistoryFrom = document.getElementById("sales-history-from");
+    elements.salesHistoryTo = document.getElementById("sales-history-to");
+    elements.salesHistoryFromNative = document.getElementById("sales-history-from-native");
+    elements.salesHistoryToNative = document.getElementById("sales-history-to-native");
+    elements.salesHistoryFromCalendar = document.getElementById("sales-history-from-calendar");
+    elements.salesHistoryToCalendar = document.getElementById("sales-history-to-calendar");
+    elements.salesHistoryPayment = document.getElementById("sales-history-payment");
+    elements.salesHistoryCashier = document.getElementById("sales-history-cashier");
+    elements.salesHistoryReset = document.getElementById("sales-history-reset");
+    elements.salesHistoryError = document.getElementById("sales-history-error");
+    elements.salesHistoryCount = document.getElementById("sales-history-count");
+    elements.salesHistoryTotal = document.getElementById("sales-history-total");
+    elements.salesHistoryBody = document.getElementById("sales-history-body");
+    elements.salesHistoryEmpty = document.getElementById("sales-history-empty");
+    elements.salesHistoryPrevious = document.getElementById("sales-history-previous");
+    elements.salesHistoryNext = document.getElementById("sales-history-next");
+    elements.salesHistoryPage = document.getElementById("sales-history-page");
 
     // Product form modal
     elements.productModal = document.getElementById("product-modal");
@@ -421,7 +442,7 @@
 
   /**
    * Switch the visible section. POS shows the sales grid + cart; Products and
-   * Inventory show the management screen. Other sections are not built yet.
+   * Inventory show the management screen; each other key owns one page view.
    */
   function showSection(key) {
     if (!currentUser || !auth.canAccess(currentUser.role, key)) {
@@ -437,6 +458,7 @@
     elements.usersView.hidden = key !== "users";
     elements.settingsView.hidden = key !== "settings";
     elements.reportsView.hidden = key !== "reports";
+    elements.salesHistoryView.hidden = key !== "sales-history";
     if (isManage) {
       renderManageScreen(key);
     } else if (key === "users") {
@@ -445,6 +467,8 @@
       renderSettings();
     } else if (key === "reports") {
       renderReports();
+    } else if (key === "sales-history") {
+      renderSalesHistory();
     }
     renderNav();
   }
@@ -501,7 +525,7 @@
       showSection("pos");
       return;
     }
-    if (item.key === "products" || item.key === "inventory" || item.key === "users" || item.key === "settings" || item.key === "reports") {
+    if (item.key === "products" || item.key === "inventory" || item.key === "users" || item.key === "settings" || item.key === "reports" || item.key === "sales-history") {
       // Nav is already role-filtered; this guard is defence in depth.
       if (currentUser && auth.canAccess(currentUser.role, item.key)) {
         showSection(item.key);
@@ -510,7 +534,6 @@
       }
       return;
     }
-    // Sales History is accessible per role but not built yet.
     showToast(item.label + " is coming in a later feature.");
   }
 
@@ -2197,6 +2220,190 @@
     showToast("Settings saved.");
   }
 
+  // --- Sales history ------------------------------------------------------
+
+  var SALES_HISTORY_PAGE_SIZE = 12;
+  var salesHistoryPage = 1;
+
+  function bindSalesHistoryEvents() {
+    setDefaultSalesHistoryDates();
+    var rerender = function () { salesHistoryPage = 1; renderSalesHistory(); };
+    elements.salesHistorySearch.addEventListener("input", rerender);
+    elements.salesHistoryFrom.addEventListener("change", rerender);
+    elements.salesHistoryTo.addEventListener("change", rerender);
+    elements.salesHistoryPayment.addEventListener("change", rerender);
+    elements.salesHistoryCashier.addEventListener("change", rerender);
+    elements.salesHistoryFrom.addEventListener("keydown", function (event) { if (event.key === "Enter") { rerender(); } });
+    elements.salesHistoryTo.addEventListener("keydown", function (event) { if (event.key === "Enter") { rerender(); } });
+    bindSalesHistoryCalendar(elements.salesHistoryFromCalendar, elements.salesHistoryFromNative, elements.salesHistoryFrom, rerender);
+    bindSalesHistoryCalendar(elements.salesHistoryToCalendar, elements.salesHistoryToNative, elements.salesHistoryTo, rerender);
+    elements.salesHistoryReset.addEventListener("click", function () {
+      elements.salesHistorySearch.value = "";
+      elements.salesHistoryFrom.value = "";
+      elements.salesHistoryTo.value = "";
+      elements.salesHistoryFromNative.value = "";
+      elements.salesHistoryToNative.value = "";
+      elements.salesHistoryPayment.value = "all";
+      elements.salesHistoryCashier.value = "all";
+      rerender();
+    });
+    elements.salesHistoryPrevious.addEventListener("click", function () {
+      if (salesHistoryPage > 1) { salesHistoryPage--; renderSalesHistory(); }
+    });
+    elements.salesHistoryNext.addEventListener("click", function () {
+      salesHistoryPage++;
+      renderSalesHistory();
+    });
+  }
+
+  function setDefaultSalesHistoryDates() {
+    var today = new Date();
+    var from = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 30);
+    var fromKey = localDateKey(from);
+    var toKey = localDateKey(today);
+    elements.salesHistoryFrom.value = reports.formatDateKey(fromKey);
+    elements.salesHistoryTo.value = reports.formatDateKey(toKey);
+    elements.salesHistoryFromNative.value = fromKey;
+    elements.salesHistoryToNative.value = toKey;
+  }
+
+  function bindSalesHistoryCalendar(button, nativeInput, displayInput, onChange) {
+    button.addEventListener("click", function () {
+      var currentKey = reports.displayDateToKey(displayInput.value);
+      if (currentKey) { nativeInput.value = currentKey; }
+      if (typeof nativeInput.showPicker === "function") { nativeInput.showPicker(); }
+      else { nativeInput.click(); }
+    });
+    nativeInput.addEventListener("change", function () {
+      if (nativeInput.value) {
+        displayInput.value = reports.formatDateKey(nativeInput.value);
+        onChange();
+      }
+    });
+  }
+
+  function localDateKey(date) {
+    return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
+  }
+
+  function renderSalesHistoryCashiers(sales) {
+    var selected = elements.salesHistoryCashier.value || "all";
+    var names = [];
+    for (var i = 0; i < sales.length; i++) {
+      var name = sales[i].cashier && sales[i].cashier.name;
+      if (name && names.indexOf(name) === -1) { names.push(name); }
+    }
+    names.sort();
+    elements.salesHistoryCashier.innerHTML = "";
+    var all = document.createElement("option");
+    all.value = "all";
+    all.textContent = "All cashiers";
+    elements.salesHistoryCashier.appendChild(all);
+    for (var j = 0; j < names.length; j++) {
+      var option = document.createElement("option");
+      option.value = names[j];
+      option.textContent = names[j];
+      elements.salesHistoryCashier.appendChild(option);
+    }
+    elements.salesHistoryCashier.value = names.indexOf(selected) !== -1 ? selected : "all";
+  }
+
+  function renderSalesHistory() {
+    if (!currentUser || !auth.canAccess(currentUser.role, "sales-history")) {
+      showToast("You do not have access to Sales History.");
+      showSection("pos");
+      return;
+    }
+    var fromText = elements.salesHistoryFrom.value.trim();
+    var toText = elements.salesHistoryTo.value.trim();
+    var fromDate = fromText ? reports.displayDateToKey(fromText) : "";
+    var toDate = toText ? reports.displayDateToKey(toText) : "";
+    if ((fromText && !fromDate) || (toText && !toDate)) {
+      elements.salesHistoryError.textContent = "Enter dates as DD-MM-YYYY.";
+      return;
+    }
+    if (fromDate && toDate && fromDate > toDate) {
+      elements.salesHistoryError.textContent = "From date cannot be later than To date.";
+      return;
+    }
+    elements.salesHistoryError.textContent = "";
+    elements.salesHistoryFrom.value = fromDate ? reports.formatDateKey(fromDate) : "";
+    elements.salesHistoryTo.value = toDate ? reports.formatDateKey(toDate) : "";
+    elements.salesHistoryFromNative.value = fromDate;
+    elements.salesHistoryToNative.value = toDate;
+    var storedSales = storage.getSales();
+    if (!Array.isArray(storedSales)) { storedSales = []; }
+    renderSalesHistoryCashiers(storedSales.filter(function (sale) { return sale && sale.status === "completed"; }));
+    var history = salesHistory.getHistory({
+      query: elements.salesHistorySearch.value,
+      fromDate: fromDate,
+      toDate: toDate,
+      cashier: elements.salesHistoryCashier.value,
+      paymentMethod: elements.salesHistoryPayment.value
+    });
+    var pageCount = Math.max(1, Math.ceil(history.sales.length / SALES_HISTORY_PAGE_SIZE));
+    if (salesHistoryPage > pageCount) { salesHistoryPage = pageCount; }
+    var start = (salesHistoryPage - 1) * SALES_HISTORY_PAGE_SIZE;
+    var pageSales = history.sales.slice(start, start + SALES_HISTORY_PAGE_SIZE);
+
+    elements.salesHistoryCount.textContent = String(history.transactionCount);
+    elements.salesHistoryTotal.textContent = money.formatMoney(history.totalRevenue);
+    elements.salesHistoryBody.innerHTML = "";
+    for (var i = 0; i < pageSales.length; i++) {
+      elements.salesHistoryBody.appendChild(buildSalesHistoryRow(pageSales[i]));
+    }
+    elements.salesHistoryEmpty.hidden = history.sales.length !== 0;
+    elements.salesHistoryPage.textContent = "Page " + salesHistoryPage + " of " + pageCount;
+    elements.salesHistoryPrevious.disabled = salesHistoryPage <= 1;
+    elements.salesHistoryNext.disabled = salesHistoryPage >= pageCount;
+    elements.salesHistoryPrevious.parentElement.hidden = history.sales.length <= SALES_HISTORY_PAGE_SIZE;
+  }
+
+  function buildSalesHistoryRow(sale) {
+    var row = document.createElement("tr");
+    var items = Array.isArray(sale.items) ? sale.items : [];
+    var unitCount = items.reduce(function (sum, item) { return sum + Number(item.quantity || 0); }, 0);
+    appendHistoryCell(row, "Receipt", sale.receiptNumber || "—", "sales-history__receipt");
+    appendHistoryCell(row, "Date & time", formatSalesHistoryDateTime(sale.createdAt));
+    appendHistoryCell(row, "Cashier", (sale.cashier && sale.cashier.name) || "—");
+    appendHistoryCell(row, "Payment", sale.payment && sale.payment.method === "momo" ? "MoMo" : "Cash");
+    appendHistoryCell(row, "Items", unitCount + (unitCount === 1 ? " item" : " items"));
+    appendHistoryCell(row, "Total", money.formatMoney(sale.total), "sales-history__total");
+    var actionCell = document.createElement("td");
+    actionCell.setAttribute("data-label", "Action");
+    var view = document.createElement("button");
+    view.type = "button";
+    view.className = "btn btn--secondary";
+    view.textContent = "View receipt";
+    view.setAttribute("aria-label", "View receipt " + (sale.receiptNumber || ""));
+    view.addEventListener("click", function () { showReceipt(sale, true); });
+    actionCell.appendChild(view);
+    row.appendChild(actionCell);
+    return row;
+  }
+
+  function appendHistoryCell(row, label, value, className) {
+    var cell = document.createElement("td");
+    cell.setAttribute("data-label", label);
+    cell.className = className || "";
+    cell.textContent = value;
+    row.appendChild(cell);
+  }
+
+  function formatSalesHistoryDateTime(iso) {
+    try {
+      var date = new Date(iso);
+      if (isNaN(date.getTime())) { return "—"; }
+      var day = String(date.getDate()).padStart(2, "0");
+      var month = String(date.getMonth() + 1).padStart(2, "0");
+      var hours = String(date.getHours()).padStart(2, "0");
+      var minutes = String(date.getMinutes()).padStart(2, "0");
+      return day + "-" + month + "-" + date.getFullYear() + " " + hours + ":" + minutes;
+    } catch (error) {
+      return "—";
+    }
+  }
+
   // --- Checkout (Cash / MoMo) ---------------------------------------------
 
   var checkoutMethod = "cash"; // "cash" | "momo"
@@ -2344,8 +2551,8 @@
 
   // --- Receipt -------------------------------------------------------------
 
-  function showReceipt(sale) {
-    renderReceipt(sale);
+  function showReceipt(sale, isHistorical) {
+    renderReceipt(sale, isHistorical);
     elements.receiptModal.hidden = false;
     elements.receiptDone.focus();
   }
@@ -2359,7 +2566,7 @@
     window.print();
   }
 
-  function renderReceipt(sale) {
+  function renderReceipt(sale, isHistorical) {
     var settings = state.settings || {};
     var container = elements.receiptContent;
     container.innerHTML = "";
@@ -2390,7 +2597,7 @@
     var meta = document.createElement("div");
     meta.className = "receipt__meta";
     meta.appendChild(receiptMetaLine("Receipt", sale.receiptNumber));
-    meta.appendChild(receiptMetaLine("Date", formatDateTime(sale.createdAt)));
+    meta.appendChild(receiptMetaLine("Date", isHistorical ? formatSalesHistoryDateTime(sale.createdAt) : formatDateTime(sale.createdAt)));
     if (sale.cashier && sale.cashier.name) {
       meta.appendChild(receiptMetaLine("Cashier", sale.cashier.name));
     }
@@ -2516,6 +2723,7 @@
     bindManageEvents();
     bindAdminEvents();
     bindReportEvents();
+    bindSalesHistoryEvents();
     bindCheckoutEvents();
 
     // POS content can be rendered while hidden; it is revealed after login.
