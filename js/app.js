@@ -2526,15 +2526,16 @@
       discount: 0,
       total: total,
       payment: payment,
+      receiptSettings: storage.createReceiptSettingsSnapshot(state.settings),
       status: "completed"
     };
 
     // Stock is only reduced here, inside a completed sale.
-    var ok = storage.completeSale(sale);
-    if (!ok) {
+    var completion = storage.completeSale(sale);
+    if (!completion.success) {
       isCompleting = false;
       elements.checkoutComplete.disabled = false;
-      setCheckoutError("Could not complete the sale. Please try again.");
+      setCheckoutError(completion.message || "Could not save the sale safely. Please try again.");
       return;
     }
 
@@ -2567,7 +2568,7 @@
   }
 
   function renderReceipt(sale, isHistorical) {
-    var settings = state.settings || {};
+    var settings = storage.getReceiptSettings(sale, state.settings);
     var container = elements.receiptContent;
     container.innerHTML = "";
     container.className = "receipt " + (settings.receiptPaperWidth === "58mm" ? "receipt--58mm" : "receipt--80mm");
