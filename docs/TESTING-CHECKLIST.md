@@ -117,6 +117,16 @@ Expected line total: GH₵144.00
 - [ ] Cart total is correct.
 - [ ] Empty-cart message is clear.
 - [ ] Refresh restores the cart if cart persistence is enabled.
+- [ ] Cart badge shows the total quantity across all cart lines.
+- [ ] Added and quantity-updated cart lines receive a brief visual highlight.
+- [ ] On desktop, long cart items scroll while subtotal, total, and Checkout remain visible.
+
+## 6A. POS Search and Popular Products
+
+- [ ] Product search matches exact, partial, and differently-cased names.
+- [ ] Product search combines with the selected real category.
+- [ ] Popular shows only active products with `popular === true` without changing their real categories.
+- [ ] Products without a `popular` property remain available in normal category and search results.
 
 ## 7. Inventory
 

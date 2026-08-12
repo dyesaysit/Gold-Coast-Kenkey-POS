@@ -98,6 +98,7 @@
     menuItems: [
       {
         id: "jollof-fried-rice",
+        popular: true,
         name: "Jollof / Fried Rice",
         categoryId: "jollof-fried-rice",
         itemType: "configured-meal",
@@ -153,6 +154,7 @@
       },
       {
         id: "kenkey-meal-pack",
+        popular: true,
         name: "Kenkey Meal Pack",
         categoryId: "kenkey-meal-packs",
         itemType: "configured-meal",
@@ -363,7 +365,7 @@
     // placeholders (TODO 7). "Pineapple Juice" is kept from the original seed
     // even though it is not on the provided menu (TODO 8).
     inventoryProducts: [
-      { id: "coca-cola", name: "Coca Cola", categoryId: "drinks", itemType: "inventory-product", image: "", sellingPrice: 10, stockQuantity: DEFAULT_DRINK_STOCK, lowStockLevel: DEFAULT_DRINK_LOW, active: true },
+      { id: "coca-cola", name: "Coca Cola", categoryId: "drinks", itemType: "inventory-product", image: "", sellingPrice: 10, stockQuantity: DEFAULT_DRINK_STOCK, lowStockLevel: DEFAULT_DRINK_LOW, active: true, popular: true },
       { id: "sprite", name: "Sprite", categoryId: "drinks", itemType: "inventory-product", image: "", sellingPrice: 10, stockQuantity: DEFAULT_DRINK_STOCK, lowStockLevel: DEFAULT_DRINK_LOW, active: true },
       { id: "fanta", name: "Fanta", categoryId: "drinks", itemType: "inventory-product", image: "", sellingPrice: 10, stockQuantity: DEFAULT_DRINK_STOCK, lowStockLevel: DEFAULT_DRINK_LOW, active: true },
       { id: "malt", name: "Malt", categoryId: "drinks", itemType: "inventory-product", image: "", sellingPrice: 12, stockQuantity: DEFAULT_DRINK_STOCK, lowStockLevel: DEFAULT_DRINK_LOW, active: true },
