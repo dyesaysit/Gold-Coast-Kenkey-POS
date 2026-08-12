@@ -28,6 +28,7 @@
   var inventoryReport = global.GCK.inventoryReport;
   var inventoryReportPdf = global.GCK.inventoryReportPdf;
   var salesHistory = global.GCK.salesHistory;
+  var backupService = global.GCK.backup;
 
   // In-memory view of catalogue data, loaded once from storage.
   var state = {
@@ -180,6 +181,18 @@
     elements.sfReceiptExtraInfo = document.getElementById("sf-receipt-extra-info");
     elements.sfReceiptPaper = document.getElementById("sf-receipt-paper");
     elements.settingsError = document.getElementById("settings-error");
+    elements.backupExport = document.getElementById("backup-export");
+    elements.backupFile = document.getElementById("backup-file");
+    elements.backupChoose = document.getElementById("backup-choose");
+    elements.backupRestore = document.getElementById("backup-restore");
+    elements.backupError = document.getElementById("backup-error");
+    elements.backupPreview = document.getElementById("backup-preview");
+    elements.backupBusiness = document.getElementById("backup-business");
+    elements.backupDate = document.getElementById("backup-date");
+    elements.backupUsers = document.getElementById("backup-users");
+    elements.backupProducts = document.getElementById("backup-products");
+    elements.backupSales = document.getElementById("backup-sales");
+    elements.backupInventory = document.getElementById("backup-inventory");
 
     elements.reportsView = document.getElementById("reports-view");
     elements.reportsFromDate = document.getElementById("reports-from-date");
@@ -1995,6 +2008,7 @@
 
   var editingUserId = null;
   var settingsLogo = "";
+  var selectedBackup = null;
 
   function isAdmin() {
     return !!currentUser && currentUser.role === "admin";
@@ -2024,6 +2038,17 @@
       event.target.value = "";
       handleSettingsLogo(file);
     });
+    elements.backupExport.addEventListener("click", exportPosBackup);
+    elements.backupChoose.addEventListener("click", function () {
+      if (!isAdmin()) { showToast("Admin access is required."); return; }
+      elements.backupFile.click();
+    });
+    elements.backupFile.addEventListener("change", function (event) {
+      var file = event.target.files && event.target.files[0];
+      event.target.value = "";
+      selectBackupFile(file);
+    });
+    elements.backupRestore.addEventListener("click", restoreSelectedBackup);
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && !elements.userModal.hidden) { closeUserForm(); }
     });
@@ -2144,7 +2169,73 @@
     elements.sfReceiptExtraInfo.value = settings.receiptExtraInfo || "";
     elements.sfReceiptPaper.value = settings.receiptPaperWidth === "58mm" ? "58mm" : "80mm";
     elements.settingsError.textContent = "";
+    resetBackupSelection();
     setSettingsLogo(settings.logo || "");
+  }
+
+  function resetBackupSelection() {
+    selectedBackup = null;
+    elements.backupPreview.hidden = true;
+    elements.backupRestore.disabled = true;
+    elements.backupError.textContent = "";
+  }
+
+  function exportPosBackup() {
+    if (!isAdmin()) { showToast("Admin access is required."); return; }
+    var result = backupService.exportBackup(currentUser.role);
+    if (!result.ok) { elements.backupError.textContent = result.message; return; }
+    var blob = new Blob([result.json], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = url;
+    link.download = result.filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    elements.backupError.textContent = "";
+    showToast("Backup exported.");
+  }
+
+  function selectBackupFile(file) {
+    if (!isAdmin()) { showToast("Admin access is required."); return; }
+    resetBackupSelection();
+    if (!file) { return; }
+    if (!/\.json$/i.test(file.name)) {
+      elements.backupError.textContent = "Choose a JSON backup file.";
+      return;
+    }
+    file.text().then(function (text) {
+      var result = backupService.parseBackup(currentUser && currentUser.role, text);
+      if (!result.ok) { elements.backupError.textContent = result.message; return; }
+      selectedBackup = result.backup;
+      elements.backupBusiness.textContent = result.preview.businessName;
+      elements.backupDate.textContent = result.preview.backupDate;
+      elements.backupUsers.textContent = result.preview.usersCount;
+      elements.backupProducts.textContent = result.preview.productsCount;
+      elements.backupSales.textContent = result.preview.salesCount;
+      elements.backupInventory.textContent = result.preview.inventoryProductsCount;
+      elements.backupPreview.hidden = false;
+      elements.backupRestore.disabled = false;
+    }).catch(function () {
+      elements.backupError.textContent = "The selected backup file could not be read.";
+    });
+  }
+
+  function restoreSelectedBackup() {
+    if (!isAdmin()) { showToast("Admin access is required."); return; }
+    if (!selectedBackup) { elements.backupError.textContent = "Choose and validate a backup file first."; return; }
+    var confirmed = global.confirm("Restore this backup? Current POS data will be replaced and you will be signed out.");
+    if (!confirmed) { return; }
+    elements.backupRestore.disabled = true;
+    var result = backupService.restoreBackup(currentUser.role, selectedBackup, true);
+    if (!result.ok) {
+      elements.backupRestore.disabled = false;
+      elements.backupError.textContent = result.message;
+      return;
+    }
+    showToast("Backup restored. Reloading POS...");
+    global.setTimeout(function () { global.location.reload(); }, 400);
   }
 
   function setSettingsLogo(value) {

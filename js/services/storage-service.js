@@ -37,6 +37,18 @@
     };
   }
 
+  var BACKUP_KEYS = [
+    KEYS.categories,
+    KEYS.menuItems,
+    KEYS.portions,
+    KEYS.proteins,
+    KEYS.extras,
+    KEYS.inventoryProducts,
+    KEYS.sales,
+    KEYS.cashiers,
+    KEYS.settings
+  ];
+
   /**
    * Read and parse a stored value. Returns the fallback when the key is missing
    * OR when the stored text is corrupt, so a bad value never crashes the app
@@ -83,7 +95,7 @@
       else { localStorage.setItem(key, snapshot.value); }
       return true;
     } catch (error) {
-      console.error("Could not restore " + key + " after a failed sale.", error);
+      console.error("Could not restore " + key + " after a failed storage transaction.", error);
       return false;
     }
   }
@@ -324,9 +336,7 @@
    * runtime inventory behaviour continues to depend on trackInventory === true.
    * Existing explicit true/false choices are never overwritten.
    */
-  function migrateProductContract() {
-    var inventory = getInventoryProducts();
-    var meals = getMenuItems();
+  function applyProductContract(inventory, meals) {
     var inventoryChanged = false;
     var mealsChanged = false;
     var i;
@@ -351,8 +361,75 @@
         mealsChanged = true;
       }
     }
-    if (inventoryChanged) { saveInventoryProducts(inventory); }
-    if (mealsChanged) { saveMenuItems(meals); }
+    return { inventoryChanged: inventoryChanged, mealsChanged: mealsChanged };
+  }
+
+  function migrateProductContract() {
+    var inventory = getInventoryProducts();
+    var meals = getMenuItems();
+    var changes = applyProductContract(inventory, meals);
+    if (changes.inventoryChanged) { saveInventoryProducts(inventory); }
+    if (changes.mealsChanged) { saveMenuItems(meals); }
+  }
+
+  function getBackupData() {
+    var data = {};
+    for (var i = 0; i < BACKUP_KEYS.length; i++) {
+      var key = BACKUP_KEYS[i];
+      var snapshot = getRawValue(key);
+      if (!snapshot.readable) {
+        return { ok: false, code: "storage-read", key: key };
+      }
+      if (snapshot.value === null) {
+        data[key] = key === KEYS.settings ? {} : [];
+        continue;
+      }
+      try {
+        data[key] = JSON.parse(snapshot.value);
+      } catch (error) {
+        return { ok: false, code: "corrupt-current-data", key: key };
+      }
+    }
+    return { ok: true, data: data };
+  }
+
+  function restoreRawSnapshot(snapshot) {
+    var keys = BACKUP_KEYS.concat([KEYS.currentCart, KEYS.session]);
+    var restored = true;
+    for (var i = 0; i < keys.length; i++) {
+      if (!restoreRawValue(keys[i], snapshot[keys[i]])) { restored = false; }
+    }
+    return restored;
+  }
+
+  /** Replace all persistent POS data as one rollback-safe transaction. */
+  function restoreBackupData(data) {
+    var previous = {};
+    var transactionKeys = BACKUP_KEYS.concat([KEYS.currentCart, KEYS.session]);
+    var i;
+    for (i = 0; i < transactionKeys.length; i++) {
+      previous[transactionKeys[i]] = getRawValue(transactionKeys[i]);
+      if (!previous[transactionKeys[i]].readable) {
+        return { ok: false, code: "storage-read", rollbackSucceeded: true };
+      }
+    }
+
+    try {
+      applyProductContract(data[KEYS.inventoryProducts], data[KEYS.menuItems]);
+      for (i = 0; i < BACKUP_KEYS.length; i++) {
+        localStorage.setItem(BACKUP_KEYS[i], JSON.stringify(data[BACKUP_KEYS[i]]));
+      }
+      localStorage.setItem(KEYS.currentCart, "[]");
+      localStorage.removeItem(KEYS.session);
+      return { ok: true };
+    } catch (error) {
+      var failure = classifyWriteFailure(error);
+      return {
+        ok: false,
+        code: failure.code === "storage_capacity" ? "storage-capacity" : "storage-write",
+        rollbackSucceeded: restoreRawSnapshot(previous)
+      };
+    }
   }
 
   /**
@@ -413,6 +490,8 @@
     getSession: getSession,
     saveSession: saveSession,
     clearSession: clearSession,
+    getBackupData: getBackupData,
+    restoreBackupData: restoreBackupData,
     seedInitialData: seedInitialData
   };
 })(window);

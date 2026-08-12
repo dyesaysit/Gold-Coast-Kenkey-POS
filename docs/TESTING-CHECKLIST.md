@@ -300,6 +300,18 @@ Before merging any feature:
 - [ ] Print layout fits the selected 58 mm or 80 mm thermal paper width.
 - [ ] Products, Inventory, Users, and Settings Close returns to POS.
 
+## 15B. Backup and Restore
+
+- [ ] Export includes persistent POS-owned data only, excluding cart, session, and unrelated browser keys.
+- [ ] Backup filename and visible preview date use DD-MM-YYYY.
+- [ ] Corrupt JSON, wrong schemas, and unsupported versions are rejected before data changes.
+- [ ] Selected backup preview shows business, users, products, sales, and inventory counts.
+- [ ] Restore requires explicit confirmation.
+- [ ] Failed restore writes roll back to the exact previous POS data.
+- [ ] Successful restore replaces settings, users, products, inventory, and sales, then signs out.
+- [ ] Admin can export and restore; supervisor and cashier cannot.
+- [ ] Backup and Restore layout works at mobile and desktop widths.
+
 ## 16. Final Presentation Test
 
 - [ ] Fresh application can be demonstrated.

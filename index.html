@@ -197,6 +197,30 @@
         <p class="modal__error settings-form__wide" id="settings-error" role="alert"></p>
         <div class="settings-form__wide"><button class="btn btn--primary" id="settings-save" type="submit">Save settings</button></div>
       </form>
+      <section class="settings-backup" aria-labelledby="backup-title">
+        <div>
+          <h3 class="settings-backup__title" id="backup-title">Backup &amp; Restore</h3>
+          <p class="manage__hint">Export a copy of the POS data or restore a previously exported backup.</p>
+        </div>
+        <div class="settings-backup__actions">
+          <button class="btn btn--secondary" id="backup-export" type="button">Export backup</button>
+          <input class="visually-hidden" id="backup-file" type="file" accept="application/json,.json" />
+          <button class="btn btn--secondary" id="backup-choose" type="button">Choose backup file</button>
+          <button class="btn btn--danger" id="backup-restore" type="button" disabled>Restore backup</button>
+        </div>
+        <p class="modal__error" id="backup-error" role="alert"></p>
+        <article class="backup-preview" id="backup-preview" hidden aria-live="polite">
+          <h4>Selected backup</h4>
+          <dl class="backup-preview__grid">
+            <div><dt>Business</dt><dd id="backup-business"></dd></div>
+            <div><dt>Backup date</dt><dd id="backup-date"></dd></div>
+            <div><dt>Users</dt><dd id="backup-users"></dd></div>
+            <div><dt>Products</dt><dd id="backup-products"></dd></div>
+            <div><dt>Sales</dt><dd id="backup-sales"></dd></div>
+            <div><dt>Inventory products</dt><dd id="backup-inventory"></dd></div>
+          </dl>
+        </article>
+      </section>
     </section>
 
     <section class="manage reports" id="reports-view" hidden aria-labelledby="reports-title">
@@ -517,6 +541,7 @@
   <script src="js/utils/validation.js"></script>
   <script src="js/data/seed-data.js"></script>
   <script src="js/services/storage-service.js"></script>
+  <script src="js/services/backup-service.js"></script>
   <script src="js/services/sales-history-service.js"></script>
   <script src="js/services/inventory-report-service.js"></script>
   <script src="js/services/inventory-report-pdf-service.js"></script>
