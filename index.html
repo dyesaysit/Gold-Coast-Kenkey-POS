@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gold Coast Kenkey POS</title>
+  <title>Point of Sale</title>
 
   <!-- Design tokens first, then base layout, then responsive breakpoints. -->
   <link rel="stylesheet" href="css/variables.css" />
@@ -15,7 +15,7 @@
   <section class="login" id="login-view" aria-label="Sign in">
     <div class="login__card">
       <span class="brand-logo brand-logo--lg" id="login-logo" aria-hidden="true"></span>
-      <h1 class="login__business" id="login-business">Gold Coast Kenkey</h1>
+      <h1 class="login__business" id="login-business"></h1>
       <p class="login__prompt">Enter your PIN to sign in</p>
 
       <!-- Masked PIN dots (filled as digits are entered). -->
@@ -50,7 +50,7 @@
       <div class="app-header__brand">
         <span class="brand-logo" id="header-logo" aria-hidden="true"></span>
         <div class="app-header__brand-text">
-          <h1 class="app-header__title" id="business-name">Gold Coast Kenkey</h1>
+          <h1 class="app-header__title" id="business-name"></h1>
           <p class="app-header__tagline">Point of Sale</p>
         </div>
       </div>
@@ -113,11 +113,77 @@
              aria-label="Product and inventory management">
       <div class="manage__bar">
         <h2 class="section-title" id="manage-title">Products</h2>
-        <button class="btn btn--primary" id="manage-add" type="button">Add product</button>
+        <div class="page-header__actions">
+          <button class="btn btn--primary" id="manage-add" type="button">Add product</button>
+          <button class="btn btn--secondary" id="manage-close" type="button">Close</button>
+        </div>
       </div>
       <p class="manage__hint" id="manage-hint"></p>
       <div class="manage__list" id="manage-list"></div>
     </section>
+
+    <section class="manage" id="users-view" hidden aria-labelledby="users-title">
+      <div class="manage__bar">
+        <h2 class="section-title" id="users-title">Users</h2>
+        <div class="page-header__actions">
+          <button class="btn btn--primary" id="user-add" type="button">Add user</button>
+          <button class="btn btn--secondary page-close" type="button">Close</button>
+        </div>
+      </div>
+      <p class="manage__hint">Manage who can sign in and which sections they can access.</p>
+      <div class="manage__list" id="user-list"></div>
+    </section>
+
+    <section class="manage" id="settings-view" hidden aria-labelledby="settings-title">
+      <div class="manage__bar">
+        <h2 class="section-title" id="settings-title">Settings</h2>
+        <button class="btn btn--secondary page-close" type="button">Close</button>
+      </div>
+      <form class="settings-form" id="settings-form" novalidate>
+        <label class="field"><span class="field__label">Business name</span><input class="field__input" id="sf-business-name" type="text" /></label>
+        <label class="field"><span class="field__label">Short name</span><input class="field__input" id="sf-short-name" type="text" /></label>
+        <div class="field settings-form__wide">
+          <span class="field__label">Logo</span>
+          <div class="image-picker__preview settings-logo-preview" id="sf-logo-preview"></div>
+          <div class="image-picker__actions">
+            <input id="sf-logo-file" type="file" accept="image/*" class="visually-hidden" />
+            <button class="btn btn--secondary" id="sf-logo-choose" type="button">Choose logo</button>
+            <button class="btn btn--secondary" id="sf-logo-remove" type="button">Remove logo</button>
+          </div>
+          <p class="field__note">JPG, PNG, WebP or GIF, up to 5 MB. The image is compressed automatically.</p>
+        </div>
+        <label class="field"><span class="field__label">Phone</span><input class="field__input" id="sf-phone" type="tel" /></label>
+        <label class="field"><span class="field__label">Address</span><input class="field__input" id="sf-address" type="text" /></label>
+        <label class="field"><span class="field__label">Currency code</span><input class="field__input" id="sf-currency-code" type="text" maxlength="8" /></label>
+        <label class="field"><span class="field__label">Currency symbol</span><input class="field__input" id="sf-currency-symbol" type="text" maxlength="8" /></label>
+        <label class="field"><span class="field__label">Receipt prefix</span><input class="field__input" id="sf-receipt-prefix" type="text" maxlength="12" /></label>
+        <label class="field settings-form__wide"><span class="field__label">Receipt footer note</span><textarea class="field__input field__input--textarea" id="sf-receipt-footer" rows="3" maxlength="160"></textarea><span class="field__note">Shown at the bottom of every receipt.</span></label>
+        <label class="field settings-form__wide"><span class="field__label">Extra receipt information</span><textarea class="field__input field__input--textarea" id="sf-receipt-extra-info" rows="3" maxlength="240"></textarea><span class="field__note">Optional business, tax, social-media, or service information shown below the address.</span></label>
+        <label class="field"><span class="field__label">Thermal paper size</span><select class="field__input" id="sf-receipt-paper"><option value="80mm">80 mm (recommended)</option><option value="58mm">58 mm</option></select></label>
+        <p class="modal__error settings-form__wide" id="settings-error" role="alert"></p>
+        <div class="settings-form__wide"><button class="btn btn--primary" id="settings-save" type="submit">Save settings</button></div>
+      </form>
+    </section>
+  </div>
+
+  <div class="modal" id="user-modal" hidden role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
+    <div class="modal__overlay" id="user-overlay"></div>
+    <div class="modal__panel" role="document">
+      <header class="modal__header">
+        <h2 class="modal__title" id="user-modal-title">Add user</h2>
+        <button class="modal__close" id="user-close" type="button" aria-label="Close">&#10005;</button>
+      </header>
+      <form class="modal__body" id="user-form" novalidate>
+        <label class="field"><span class="field__label">Name</span><input class="field__input" id="uf-name" type="text" /></label>
+        <label class="field"><span class="field__label">PIN</span><input class="field__input" id="uf-pin" type="password" inputmode="numeric" minlength="4" maxlength="6" /><span class="field__note" id="uf-pin-note">Enter 4–6 digits.</span></label>
+        <label class="field"><span class="field__label">Role</span><select class="field__input" id="uf-role"><option value="cashier">Cashier</option><option value="supervisor">Supervisor</option><option value="admin">Admin</option></select></label>
+        <label class="field field--check"><input id="uf-active" type="checkbox" checked /><span class="field__label">Active (can sign in)</span></label>
+      </form>
+      <footer class="modal__footer">
+        <p class="modal__error" id="user-error" role="alert"></p>
+        <div class="modal__actions"><button class="btn btn--secondary" id="user-cancel" type="button">Cancel</button><button class="btn btn--primary" id="user-save" type="button">Save user</button></div>
+      </footer>
+    </div>
   </div>
 
   <!--
@@ -320,19 +386,20 @@
   </div>
 
   <!-- Receipt modal. Rendered from the saved sale snapshot by app.js. -->
-  <div class="modal" id="receipt-modal" hidden role="dialog" aria-modal="true"
+  <div class="modal receipt-modal" id="receipt-modal" hidden role="dialog" aria-modal="true"
        aria-labelledby="receipt-title">
     <div class="modal__overlay" id="receipt-overlay"></div>
-    <div class="modal__panel" role="document">
+    <div class="modal__panel receipt-modal__panel" role="document">
       <header class="modal__header">
         <h2 class="modal__title" id="receipt-title">Receipt</h2>
         <button class="modal__close" id="receipt-close" type="button" aria-label="Close">&#10005;</button>
       </header>
-      <div class="modal__body">
+      <div class="modal__body receipt-modal__body">
         <div class="receipt" id="receipt-content"></div>
       </div>
       <footer class="modal__footer">
         <div class="modal__actions">
+          <button class="btn btn--secondary" id="receipt-print" type="button">Print receipt</button>
           <button class="btn btn--primary" id="receipt-done" type="button">Done</button>
         </div>
       </footer>

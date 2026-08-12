@@ -57,23 +57,11 @@ The system must:
 
 ## 4. User Roles
 
-Version 1 has one primary role:
+- Cashier: POS only.
+- Supervisor: POS, Products, Inventory, Sales History, and Reports.
+- Admin: all sections, including Users and Settings.
 
-### Cashier
-
-The cashier can:
-
-- View active products.
-- Configure meals.
-- Add items to the cart.
-- Change quantities.
-- Remove cart items.
-- Complete cash sales.
-- View receipts.
-- View sales history.
-- View low-stock warnings.
-
-An administrator role may be added later, but it is not required for the first milestone.
+Users and Settings must enforce admin access in application logic as well as navigation visibility.
 
 ## 5. Product Types
 
@@ -266,7 +254,9 @@ Recommended version 1 rule:
 
 A receipt must include:
 
+- Business logo when configured.
 - Business name.
+- Telephone number and address when configured.
 - Receipt number.
 - Date and time.
 - Cashier name if available.
@@ -280,6 +270,9 @@ A receipt must include:
 - Amount paid.
 - Change.
 - Payment method.
+- Configurable extra information and footer note when configured.
+
+Receipts must be printable through the browser print dialog and formatted for common 58 mm and 80 mm thermal paper widths.
 
 The receipt must use the values saved in the completed sale snapshot.
 
@@ -322,6 +315,8 @@ Version 1 should contain:
 7. Sales history screen.
 8. Daily summary screen.
 9. Basic inventory screen if time permits.
+10. Admin user-management screen.
+11. Admin settings screen.
 
 ## 14. Functional Requirements
 

@@ -100,6 +100,20 @@
   function getCashiers() { return readJson(KEYS.cashiers, []); }
   function saveCashiers(cashiers) { return writeJson(KEYS.cashiers, cashiers); }
 
+  function saveCashier(cashier) {
+    var cashiers = getCashiers();
+    var replaced = false;
+    for (var i = 0; i < cashiers.length; i++) {
+      if (cashiers[i].id === cashier.id) {
+        cashiers[i] = cashier;
+        replaced = true;
+        break;
+      }
+    }
+    if (!replaced) { cashiers.push(cashier); }
+    return saveCashiers(cashiers);
+  }
+
   function getSettings() { return readJson(KEYS.settings, null); }
   function saveSettings(settings) { return writeJson(KEYS.settings, settings); }
 
@@ -235,6 +249,7 @@
     saveProduct: saveProduct,
     getCashiers: getCashiers,
     saveCashiers: saveCashiers,
+    saveCashier: saveCashier,
     getSettings: getSettings,
     saveSettings: saveSettings,
     getSales: getSales,

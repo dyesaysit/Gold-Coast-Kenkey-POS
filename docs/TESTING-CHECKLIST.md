@@ -246,6 +246,26 @@ Before merging any feature:
 - [ ] No new console errors appear.
 - [ ] No unrelated files were changed.
 
+## 15A. Users and Settings
+
+- [ ] Admin can open Users and Settings.
+- [ ] Cashier and supervisor are blocked from Users and Settings.
+- [ ] Add cashier, supervisor, and admin users.
+- [ ] Duplicate and invalid PINs are rejected.
+- [ ] User PINs are masked in the list.
+- [ ] Editing and deactivating a user persists.
+- [ ] An inactive user cannot log in.
+- [ ] The current admin cannot deactivate themselves.
+- [ ] Required settings and receipt-prefix validation work.
+- [ ] Business name and logo update login and header branding.
+- [ ] Logo preview, replace, remove, and compression work.
+- [ ] Receipt displays the saved logo and footer note.
+- [ ] Receipt date uses DD/MM/YYYY format.
+- [ ] Long receipt items scroll while totals and payment details remain visible.
+- [ ] Seller can choose Print receipt or Done without printing.
+- [ ] Print layout fits the selected 58 mm or 80 mm thermal paper width.
+- [ ] Products, Inventory, Users, and Settings Close returns to POS.
+
 ## 16. Final Presentation Test
 
 - [ ] Fresh application can be demonstrated.
