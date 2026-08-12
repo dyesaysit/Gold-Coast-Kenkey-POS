@@ -29,6 +29,7 @@
   var inventoryReportPdf = global.GCK.inventoryReportPdf;
   var salesHistory = global.GCK.salesHistory;
   var backupService = global.GCK.backup;
+  var posCatalog = global.GCK.posCatalog;
 
   // In-memory view of catalogue data, loaded once from storage.
   var state = {
@@ -69,11 +70,13 @@
     elements.appNav = document.getElementById("app-nav");
     elements.logoutButton = document.getElementById("logout-button");
     elements.categoryBar = document.getElementById("category-bar");
+    elements.productSearch = document.getElementById("product-search");
     elements.productGrid = document.getElementById("product-grid");
     elements.cartItems = document.getElementById("cart-items");
     elements.cartEmpty = document.getElementById("cart-empty");
     elements.cartSubtotal = document.getElementById("cart-subtotal");
     elements.cartTotal = document.getElementById("cart-total");
+    elements.cartCount = document.getElementById("cart-count");
     elements.checkoutButton = document.getElementById("checkout-button");
     elements.toast = document.getElementById("toast");
 
@@ -569,26 +572,12 @@
    * products, filtered by the active category and active flag.
    */
   function getVisibleProducts() {
-    var products = [];
-    var i;
-
-    for (i = 0; i < state.menuItems.length; i++) {
-      if (state.menuItems[i].active) {
-        products.push(state.menuItems[i]);
-      }
-    }
-    for (i = 0; i < state.inventoryProducts.length; i++) {
-      if (state.inventoryProducts[i].active) {
-        products.push(state.inventoryProducts[i]);
-      }
-    }
-
-    if (state.activeCategoryId === "all") {
-      return products;
-    }
-    return products.filter(function (product) {
-      return product.categoryId === state.activeCategoryId;
-    });
+    return posCatalog.getVisibleProducts(
+      state.menuItems,
+      state.inventoryProducts,
+      state.activeCategoryId,
+      elements.productSearch.value
+    );
   }
 
   // --- Rendering: categories ----------------------------------------------
@@ -596,7 +585,7 @@
   function renderCategories() {
     elements.categoryBar.innerHTML = "";
 
-    var chips = [{ id: "all", name: "All" }];
+    var chips = [{ id: "all", name: "All" }, { id: "popular", name: "Popular" }];
     var sorted = state.categories.slice().sort(function (a, b) {
       return a.displayOrder - b.displayOrder;
     });
@@ -637,7 +626,9 @@
     if (products.length === 0) {
       var empty = document.createElement("p");
       empty.className = "cart__empty";
-      empty.textContent = "No products in this category.";
+      empty.textContent = elements.productSearch.value.trim()
+        ? "No products match your search."
+        : "No products in this category.";
       elements.productGrid.appendChild(empty);
       return;
     }
@@ -1101,7 +1092,7 @@
     var lineTotal = pricing.calculateLineTotal(unitTotal, quantity);
 
     // Snapshot of the completed configuration (DATABASE-DESIGN.md section 9).
-    state.cart.push({
+    var cartItem = {
       id: createId("cart"),
       itemType: "configured-meal",
       productId: mealConfig.menuItem.id,
@@ -1124,10 +1115,11 @@
       unitTotal: unitTotal,
       quantity: quantity,
       lineTotal: lineTotal
-    });
+    };
+    state.cart.push(cartItem);
 
     // Each configuration is its own cart line (never merged with another).
-    persistAndRenderCart();
+    persistAndRenderCart(cartItem.id);
     var name = mealConfig.menuItem.name;
     closeMealModal();
     showToast(name + " added to cart.");
@@ -1156,11 +1148,13 @@
       }
     }
 
+    var changedItem;
     if (existing) {
       existing.quantity = requested;
       existing.lineTotal = pricing.calculateLineTotal(existing.unitPrice, existing.quantity);
+      changedItem = existing;
     } else {
-      state.cart.push({
+      changedItem = {
         id: createId("cart"),
         itemType: "inventory-product",
         productId: product.id,
@@ -1170,10 +1164,11 @@
         trackInventory: tracksInventory(product),
         quantity: 1,
         lineTotal: pricing.calculateLineTotal(product.sellingPrice, 1)
-      });
+      };
+      state.cart.push(changedItem);
     }
 
-    persistAndRenderCart();
+    persistAndRenderCart(changedItem.id);
     showToast(product.name + " added to cart.");
   }
 
@@ -1208,25 +1203,42 @@
     var unitPrice = (typeof item.unitTotal === "number") ? item.unitTotal : item.unitPrice;
     item.quantity = newQty;
     item.lineTotal = pricing.calculateLineTotal(unitPrice, newQty);
-    persistAndRenderCart();
+    persistAndRenderCart(item.id);
   }
 
-  function persistAndRenderCart() {
+  function bindPosEvents() {
+    elements.productSearch.addEventListener("input", renderProducts);
+  }
+
+  function persistAndRenderCart(highlightItemId) {
     storage.saveCurrentCart(state.cart);
-    renderCart();
+    renderCart(highlightItemId);
   }
 
   // --- Rendering: cart -----------------------------------------------------
 
-  function renderCart() {
+  function renderCart(highlightItemId) {
     elements.cartItems.innerHTML = "";
 
     var empty = validation.isCartEmpty(state.cart);
     elements.cartEmpty.hidden = !empty;
 
     for (var i = 0; i < state.cart.length; i++) {
-      elements.cartItems.appendChild(buildCartLine(state.cart[i]));
+      var line = buildCartLine(state.cart[i]);
+      if (state.cart[i].id === highlightItemId) {
+        line.className += " cart-item--highlight";
+        global.setTimeout(function (highlightedLine) {
+          highlightedLine.classList.remove("cart-item--highlight");
+        }, 700, line);
+      }
+      elements.cartItems.appendChild(line);
     }
+
+    var itemCount = state.cart.reduce(function (count, item) {
+      return count + Number(item.quantity || 0);
+    }, 0);
+    elements.cartCount.textContent = itemCount;
+    elements.cartCount.setAttribute("aria-label", itemCount + (itemCount === 1 ? " item" : " items"));
 
     var subtotal = pricing.calculateCartSubtotal(state.cart);
     var total = pricing.calculateSaleTotal(subtotal, 0);
@@ -2811,6 +2823,7 @@
     loadState();
     applyBranding();
     bindAuthEvents();
+    bindPosEvents();
     bindModalEvents();
     bindManageEvents();
     bindAdminEvents();

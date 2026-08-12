@@ -76,7 +76,13 @@
     <!-- Main area: product tiles + cart -->
     <main class="app-main" id="app-main">
       <section class="product-area" aria-label="Products">
-        <h2 class="section-title" id="product-area-title">Products</h2>
+        <div class="product-area__header">
+          <h2 class="section-title" id="product-area-title">Products</h2>
+          <label class="product-search">
+            <span class="visually-hidden">Search products by name</span>
+            <input class="field__input product-search__input" id="product-search" type="search" placeholder="Search products" autocomplete="off" />
+          </label>
+        </div>
         <div class="product-grid" id="product-grid">
           <!-- Product tiles are rendered by app.js -->
         </div>
@@ -84,7 +90,7 @@
 
       <!-- Cart -->
       <aside class="cart" id="cart" aria-label="Cart">
-        <h2 class="cart__title">Cart</h2>
+        <h2 class="cart__title">Cart <span class="cart__count" id="cart-count" aria-live="polite">0</span></h2>
         <ul class="cart__items" id="cart-items">
           <!-- Cart lines are rendered by app.js -->
         </ul>
@@ -541,6 +547,7 @@
   <script src="js/utils/validation.js"></script>
   <script src="js/data/seed-data.js"></script>
   <script src="js/services/storage-service.js"></script>
+  <script src="js/services/pos-catalog-service.js"></script>
   <script src="js/services/backup-service.js"></script>
   <script src="js/services/sales-history-service.js"></script>
   <script src="js/services/inventory-report-service.js"></script>
