@@ -237,6 +237,31 @@
         </div>
       </article>
     </section>
+
+    <section class="manage sales-history" id="sales-history-view" hidden aria-labelledby="sales-history-title">
+      <div class="manage__bar">
+        <div><h2 class="section-title" id="sales-history-title">Sales History</h2><p class="manage__hint">Completed sales and their original receipt details.</p></div>
+        <button class="btn btn--secondary page-close" type="button">Close</button>
+      </div>
+      <div class="sales-history__filters" aria-label="Sales history filters">
+        <label class="field sales-history__search"><span class="field__label">Receipt number</span><input class="field__input" id="sales-history-search" type="search" placeholder="Search receipt number" autocomplete="off" /></label>
+        <label class="field"><span class="field__label">From date</span><span class="date-picker"><input class="field__input date-picker__display" id="sales-history-from" type="text" inputmode="numeric" placeholder="DD-MM-YYYY" maxlength="10" /><button class="date-picker__button" id="sales-history-from-calendar" type="button" aria-label="Choose Sales History From date">&#128197;</button><input class="visually-hidden" id="sales-history-from-native" type="date" tabindex="-1" aria-hidden="true" /></span></label>
+        <label class="field"><span class="field__label">To date</span><span class="date-picker"><input class="field__input date-picker__display" id="sales-history-to" type="text" inputmode="numeric" placeholder="DD-MM-YYYY" maxlength="10" /><button class="date-picker__button" id="sales-history-to-calendar" type="button" aria-label="Choose Sales History To date">&#128197;</button><input class="visually-hidden" id="sales-history-to-native" type="date" tabindex="-1" aria-hidden="true" /></span></label>
+        <label class="field"><span class="field__label">Cashier</span><select class="field__input" id="sales-history-cashier"><option value="all">All cashiers</option></select></label>
+        <label class="field"><span class="field__label">Payment</span><select class="field__input" id="sales-history-payment"><option value="all">All payments</option><option value="cash">Cash</option><option value="momo">MoMo</option></select></label>
+        <button class="btn btn--secondary" id="sales-history-reset" type="button">Reset filters</button>
+      </div>
+      <p class="modal__error" id="sales-history-error" role="alert"></p>
+      <div class="sales-history__summary" aria-live="polite">
+        <article class="report-card"><span class="report-card__label">Completed transactions</span><strong class="report-card__value" id="sales-history-count">0</strong></article>
+        <article class="report-card"><span class="report-card__label">Filtered sales total</span><strong class="report-card__value" id="sales-history-total">GH₵0.00</strong></article>
+      </div>
+      <div class="sales-history__table-wrap">
+        <table class="sales-history__table"><thead><tr><th>Receipt</th><th>Date &amp; time</th><th>Cashier</th><th>Payment</th><th>Items</th><th>Total</th><th><span class="visually-hidden">Action</span></th></tr></thead><tbody id="sales-history-body"></tbody></table>
+      </div>
+      <p class="sales-history__empty" id="sales-history-empty" hidden>No completed sales match these filters.</p>
+      <nav class="sales-history__pagination" aria-label="Sales history pages"><button class="btn btn--secondary" id="sales-history-previous" type="button">Previous</button><span id="sales-history-page">Page 1 of 1</span><button class="btn btn--secondary" id="sales-history-next" type="button">Next</button></nav>
+    </section>
   </div>
 
   <div class="modal" id="user-modal" hidden role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
@@ -492,6 +517,7 @@
   <script src="js/utils/validation.js"></script>
   <script src="js/data/seed-data.js"></script>
   <script src="js/services/storage-service.js"></script>
+  <script src="js/services/sales-history-service.js"></script>
   <script src="js/services/inventory-report-service.js"></script>
   <script src="js/services/inventory-report-pdf-service.js"></script>
   <script src="js/services/reports-service.js"></script>

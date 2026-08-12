@@ -1156,6 +1156,61 @@ button.modal__close:hover {
   text-align: right;
 }
 
+/* --- Sales history ------------------------------------------------------ */
+.sales-history__filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(140px, 1fr)) auto;
+  gap: var(--space-sm);
+  align-items: end;
+  margin-bottom: var(--space-md);
+}
+
+.sales-history__summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 260px));
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.sales-history__table-wrap {
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.sales-history__table { width: 100%; border-collapse: collapse; }
+.sales-history__table th,
+.sales-history__table td { padding: var(--space-md); border-bottom: 1px solid var(--color-border); text-align: left; vertical-align: middle; }
+.sales-history__table th { color: var(--color-primary-dark); background: var(--color-background); white-space: nowrap; }
+.sales-history__table tbody tr:last-child td { border-bottom: 0; }
+.sales-history__receipt,
+.sales-history__total { font-weight: bold; }
+.sales-history__empty { padding: var(--space-xl); text-align: center; color: var(--color-text-muted); background: var(--color-surface); border-radius: var(--radius-lg); }
+.sales-history__pagination { display: flex; align-items: center; justify-content: center; gap: var(--space-md); margin-top: var(--space-md); }
+
+@media (max-width: 900px) {
+  .sales-history__filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sales-history__search { grid-column: 1 / -1; }
+}
+
+@media (max-width: 639px) {
+  .sales-history__filters,
+  .sales-history__summary { grid-template-columns: 1fr; }
+  .sales-history__table-wrap { overflow: visible; border: 0; background: transparent; }
+  .sales-history__table thead { display: none; }
+  .sales-history__table,
+  .sales-history__table tbody,
+  .sales-history__table tr,
+  .sales-history__table td { display: block; width: 100%; }
+  .sales-history__table tr { margin-bottom: var(--space-md); padding: var(--space-sm); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+  .sales-history__table td { display: flex; justify-content: space-between; gap: var(--space-sm); padding: var(--space-xs); border: 0; text-align: right; }
+  .sales-history__table td::before { content: attr(data-label); color: var(--color-text-muted); font-weight: bold; text-align: left; }
+  .sales-history__table td:last-child { margin-top: var(--space-sm); }
+  .sales-history__table td:last-child::before { content: none; }
+  .sales-history__table td .btn { width: 100%; }
+}
+
 .inventory-report {
   display: flex;
   flex-direction: column;

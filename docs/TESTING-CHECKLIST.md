@@ -185,6 +185,14 @@ Expected line total: GH₵144.00
 - [ ] Refresh does not remove history.
 - [ ] History uses saved sale snapshots.
 - [ ] Empty history has a clear message.
+- [ ] Only completed sales appear, newest first.
+- [ ] Receipt search and cashier filter work.
+- [ ] From and To dates filter inclusively and reject an invalid range.
+- [ ] Cash and MoMo payment filters work.
+- [ ] Filtered transaction count and sales total are correct.
+- [ ] Pagination works without losing the active filters.
+- [ ] Sales History works at mobile and desktop widths.
+- [ ] Supervisor and Admin can access Sales History; Cashier cannot.
 
 ## 11. Daily Summary
 
