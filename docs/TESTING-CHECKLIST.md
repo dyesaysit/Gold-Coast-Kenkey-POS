@@ -179,13 +179,30 @@ Expected line total: GH₵144.00
 
 ## 11. Daily Summary
 
+- [ ] From and To default to today and display as DD-MM-YYYY.
+- [ ] Calendar buttons select From and To dates while keeping DD-MM-YYYY visible.
+- [ ] Same From and To produces a daily report title.
+- [ ] A multi-day range includes both boundary dates.
+- [ ] From later than To is rejected.
+- [ ] Printed report contains branding, period, generated time, totals, and full lists.
+- [ ] Reports default to 80 mm thermal printing and also support 58 mm and A4.
+- [ ] Export PDF downloads an A4 PDF directly without a popup or new tab.
+- [ ] Report printing excludes navigation, controls, and normal page background.
+- [ ] Receipt thermal print layout remains unchanged.
 - [ ] Number of sales is correct.
 - [ ] Daily total is correct.
-- [ ] Cash received is correct.
+- [ ] Cash sales total includes only completed cash sales.
+- [ ] MoMo sales total includes only completed MoMo sales.
+- [ ] Cash and MoMo totals are correct on a mixed-payment day.
 - [ ] Sales from another date are excluded.
+- [ ] Incomplete and cancelled sales are excluded.
+- [ ] Products and configured meals show snapshot names and quantities.
 - [ ] Best-selling item is correct if implemented.
 - [ ] Low-stock list is correct.
 - [ ] Zero-sales day displays correctly.
+- [ ] Cashier cannot access Reports.
+- [ ] Supervisor and Admin can access Reports.
+- [ ] Reports Close returns to POS.
 
 ## 12. Data Validation
 
