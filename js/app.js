@@ -448,6 +448,15 @@
     elements.posView.hidden = false;
     renderUserArea();
     showSection(defaultNavKeyFor(currentUser));
+    syncHeaderHeight();
+  }
+
+  /** Measure the header so the desktop cart sidebar sits just below it. */
+  function syncHeaderHeight() {
+    var header = document.querySelector(".app-header");
+    if (header && elements.posView && header.offsetHeight > 0) {
+      elements.posView.style.setProperty("--header-height", header.offsetHeight + "px");
+    }
   }
 
   /** The section a role lands on: its first accessible nav item. */
@@ -468,6 +477,8 @@
     activeNavKey = key;
     var isPos = (key === "pos");
     var isManage = (key === "products" || key === "inventory");
+    // The desktop cart sidebar's width is only reserved on the POS screen.
+    elements.posView.setAttribute("data-cart", isPos ? "on" : "off");
     elements.categoryBar.hidden = !isPos;
     elements.appMain.hidden = !isPos;
     elements.manageView.hidden = !isManage;
@@ -2832,6 +2843,7 @@
     bindReportEvents();
     bindSalesHistoryEvents();
     bindCheckoutEvents();
+    window.addEventListener("resize", syncHeaderHeight);
 
     // POS content can be rendered while hidden; it is revealed after login.
     renderCategories();

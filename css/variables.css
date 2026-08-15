@@ -43,6 +43,9 @@
   /* Minimum touch target (UI-GUIDELINES.md section 8) */
   --touch-target: 44px;
 
+  /* Width of the desktop cart sidebar */
+  --cart-width: 360px;
+
   --shadow-tile: 0 1px 3px rgba(0, 0, 0, 0.12);
   --shadow-panel: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
