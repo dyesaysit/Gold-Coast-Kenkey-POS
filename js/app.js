@@ -281,6 +281,24 @@
     elements.pfError = document.getElementById("pf-error");
     elements.pfCancel = document.getElementById("pf-cancel");
     elements.pfSave = document.getElementById("pf-save");
+
+    // Menu editor: packages (portions) + allowed extras (meals only)
+    elements.pfPackagesSection = document.getElementById("pf-packages-section");
+    elements.pfPackagesList = document.getElementById("pf-packages-list");
+    elements.pfAddPackage = document.getElementById("pf-add-package");
+    elements.pfExtrasSection = document.getElementById("pf-extras-section");
+    elements.pfExtrasList = document.getElementById("pf-extras-list");
+    elements.pfManageExtras = document.getElementById("pf-manage-extras");
+
+    // Extras library modal
+    elements.extrasModal = document.getElementById("extras-modal");
+    elements.extrasOverlay = document.getElementById("extras-overlay");
+    elements.extrasClose = document.getElementById("extras-close");
+    elements.extrasEditorList = document.getElementById("extras-editor-list");
+    elements.extrasAdd = document.getElementById("extras-add");
+    elements.extrasError = document.getElementById("extras-error");
+    elements.extrasCancel = document.getElementById("extras-cancel");
+    elements.extrasSave = document.getElementById("extras-save");
   }
 
   /** Show a short, clear message (UI-GUIDELINES.md section 16). */
@@ -741,6 +759,12 @@
     }
 
     tile.appendChild(imageWrap);
+    if (product.popular) {
+      var badge = document.createElement("span");
+      badge.className = "product-tile__badge";
+      badge.textContent = "Popular";
+      tile.appendChild(badge);
+    }
     tile.appendChild(body);
     tile.addEventListener("click", function () {
       handleProductClick(product);
@@ -1413,8 +1437,26 @@
     elements.productClose.addEventListener("click", closeProductForm);
     elements.productOverlay.addEventListener("click", closeProductForm);
     document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape" && !elements.productModal.hidden) {
+      if (event.key === "Escape" && !elements.productModal.hidden && elements.extrasModal.hidden) {
         closeProductForm();
+      }
+    });
+
+    // Menu editor: packages + extras library
+    elements.pfAddPackage.addEventListener("click", function () {
+      elements.pfPackagesList.appendChild(buildPackageRow(null));
+    });
+    elements.pfManageExtras.addEventListener("click", openExtrasEditor);
+    elements.extrasAdd.addEventListener("click", function () {
+      elements.extrasEditorList.appendChild(buildExtraEditRow(null));
+    });
+    elements.extrasSave.addEventListener("click", saveExtrasLibrary);
+    elements.extrasCancel.addEventListener("click", closeExtrasEditor);
+    elements.extrasClose.addEventListener("click", closeExtrasEditor);
+    elements.extrasOverlay.addEventListener("click", closeExtrasEditor);
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !elements.extrasModal.hidden) {
+        closeExtrasEditor();
       }
     });
   }
@@ -1658,6 +1700,8 @@
       elements.pfActive.checked = true;
       setFormImage("");
     }
+    renderPackages(product);
+    renderExtrasChecklist(product ? (product.allowedExtraIds || []) : []);
     updateFormVisibility();
     elements.productModal.hidden = false;
     elements.pfName.focus();
@@ -1683,13 +1727,16 @@
     }
   }
 
-  /** Show/hide price and stock fields per product type + track toggle. */
+  /** Show/hide price/stock (simple) vs packages/extras (meal) per type. */
   function updateFormVisibility() {
     var isMeal = elements.pfType.value === "configured-meal";
     // Configured meals: no selling price here, never inventory-tracked.
     elements.pfMealNote.hidden = !isMeal;
     elements.pfPriceField.hidden = isMeal;
     elements.pfTrackField.hidden = isMeal;
+    // Packages + allowed extras only apply to configured meals.
+    elements.pfPackagesSection.hidden = !isMeal;
+    elements.pfExtrasSection.hidden = !isMeal;
     if (isMeal) {
       elements.pfTrack.checked = false;
     }
@@ -1732,14 +1779,22 @@
       active: elements.pfActive.checked
     };
 
+    var mealPortions = null;
     if (isMeal) {
-      // Meals: never inventory, priced by portions. Do not change pricing here.
+      // Meals: never inventory; priced by their packages (portions) below.
       product.trackInventory = false;
       product.stockQuantity = null;
       product.lowStockLevel = null;
-      product.portionIds = (existing && existing.portionIds) ? existing.portionIds : [];
-      product.allowedExtraIds = (existing && existing.allowedExtraIds) ? existing.allowedExtraIds : [];
       if (existing && existing.description) { product.description = existing.description; }
+
+      var collected = collectPackages(product.id);
+      if (collected.error) {
+        setFormError(collected.error);
+        return;
+      }
+      mealPortions = collected.portions;
+      product.portionIds = mealPortions.map(function (portion) { return portion.id; });
+      product.allowedExtraIds = collectCheckedExtras();
     } else {
       if (!validation.isValidPrice(elements.pfPrice.value) || elements.pfPrice.value === "") {
         setFormError("Enter a valid selling price (a number, 0 or more).");
@@ -1767,10 +1822,262 @@
     }
 
     storage.saveProduct(product);
+    if (isMeal) {
+      persistMealPortions(product.id, mealPortions);
+    }
     reloadCatalogue();          // refresh in-memory data + POS grid
     closeProductForm();
     renderManageScreen(activeNavKey); // refresh the management list
     showToast("Product saved.");
+  }
+
+  // --- Menu editor: packages (portions) ------------------------------------
+
+  /** Render the meal's packages as editable rows (empty for a new meal). */
+  function renderPackages(product) {
+    elements.pfPackagesList.innerHTML = "";
+    if (!product || !isConfiguredMeal(product)) {
+      return;
+    }
+    var portions = getPortionsForMeal(product);
+    for (var i = 0; i < portions.length; i++) {
+      elements.pfPackagesList.appendChild(buildPackageRow(portions[i]));
+    }
+  }
+
+  function buildPackageRow(portion) {
+    var row = document.createElement("div");
+    row.className = "pkg-row";
+    if (portion && portion.id) {
+      row.setAttribute("data-portion-id", portion.id);
+    }
+
+    var grid = document.createElement("div");
+    grid.className = "pkg-row__grid";
+    var nameInput = document.createElement("input");
+    nameInput.className = "field__input pkg-row__name";
+    nameInput.type = "text";
+    nameInput.placeholder = "Package name (e.g. Regular)";
+    nameInput.value = portion ? (portion.name || "") : "";
+    var priceInput = document.createElement("input");
+    priceInput.className = "field__input pkg-row__price";
+    priceInput.type = "number";
+    priceInput.min = "0";
+    priceInput.step = "0.01";
+    priceInput.inputMode = "decimal";
+    priceInput.placeholder = "Price";
+    priceInput.value = portion && typeof portion.price === "number" ? portion.price : "";
+    grid.appendChild(nameInput);
+    grid.appendChild(priceInput);
+
+    var included = document.createElement("input");
+    included.className = "field__input pkg-row__included";
+    included.type = "text";
+    included.placeholder = "Included (e.g. 3 scoops, 1 protein)";
+    included.value = portion ? (portion.includedDescription || "") : "";
+
+    var foot = document.createElement("div");
+    foot.className = "pkg-row__foot";
+    var remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "btn btn--danger pkg-remove";
+    remove.textContent = "Remove";
+    remove.addEventListener("click", function () { row.remove(); });
+    foot.appendChild(remove);
+
+    row.appendChild(grid);
+    row.appendChild(included);
+    row.appendChild(foot);
+    return row;
+  }
+
+  /** Read the package rows into portion objects, validating each. */
+  function collectPackages(mealId) {
+    var rows = elements.pfPackagesList.querySelectorAll(".pkg-row");
+    var portions = [];
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var name = row.querySelector(".pkg-row__name").value.trim();
+      var priceValue = row.querySelector(".pkg-row__price").value;
+      var included = row.querySelector(".pkg-row__included").value.trim();
+      if (!name) {
+        return { error: "Every package needs a name (package " + (i + 1) + ")." };
+      }
+      if (!validation.isValidPrice(priceValue) || priceValue === "") {
+        return { error: "Enter a valid price for \"" + name + "\" (0 or more)." };
+      }
+      portions.push({
+        id: row.getAttribute("data-portion-id") || createId("portion"),
+        menuItemId: mealId,
+        name: name,
+        price: money.roundMoney(Number(priceValue)),
+        includedDescription: included,
+        proteinRequired: false,
+        allowedProteinIds: [],
+        active: true
+      });
+    }
+    return { portions: portions };
+  }
+
+  /** Replace just this meal's portions in storage, keeping other meals' intact. */
+  function persistMealPortions(mealId, portions) {
+    var others = storage.getPortions().filter(function (portion) {
+      return portion.menuItemId !== mealId;
+    });
+    storage.savePortions(others.concat(portions));
+  }
+
+  // --- Menu editor: allowed extras (per meal) ------------------------------
+
+  function renderExtrasChecklist(selectedIds) {
+    elements.pfExtrasList.innerHTML = "";
+    var selected = {};
+    (selectedIds || []).forEach(function (id) { selected[id] = true; });
+    var extras = storage.getExtras();
+    if (extras.length === 0) {
+      var empty = document.createElement("p");
+      empty.className = "field__note";
+      empty.textContent = "No extras yet. Use \"Manage extras…\" to add some.";
+      elements.pfExtrasList.appendChild(empty);
+      return;
+    }
+    for (var i = 0; i < extras.length; i++) {
+      elements.pfExtrasList.appendChild(buildExtraCheckbox(extras[i], !!selected[extras[i].id]));
+    }
+  }
+
+  function buildExtraCheckbox(extra, checked) {
+    var label = document.createElement("label");
+    label.className = "extras-check";
+    var input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = extra.id;
+    input.checked = checked;
+    var text = document.createElement("span");
+    text.textContent = extra.name + " (" + money.formatMoney(extra.price) + ")";
+    label.appendChild(input);
+    label.appendChild(text);
+    return label;
+  }
+
+  function collectCheckedExtras() {
+    var boxes = elements.pfExtrasList.querySelectorAll("input[type=checkbox]:checked");
+    return Array.prototype.map.call(boxes, function (box) { return box.value; });
+  }
+
+  // --- Extras library modal (shared across meals) --------------------------
+
+  function openExtrasEditor() {
+    if (!canManage()) {
+      showToast("You do not have access to manage extras.");
+      return;
+    }
+    setExtrasError("");
+    renderExtrasEditor(storage.getExtras());
+    elements.extrasModal.hidden = false;
+  }
+
+  function closeExtrasEditor() {
+    elements.extrasModal.hidden = true;
+  }
+
+  function setExtrasError(message) {
+    elements.extrasError.textContent = message;
+  }
+
+  function renderExtrasEditor(extras) {
+    elements.extrasEditorList.innerHTML = "";
+    for (var i = 0; i < extras.length; i++) {
+      elements.extrasEditorList.appendChild(buildExtraEditRow(extras[i]));
+    }
+  }
+
+  function buildExtraEditRow(extra) {
+    var row = document.createElement("div");
+    row.className = "extra-edit-row";
+    if (extra && extra.id) {
+      row.setAttribute("data-extra-id", extra.id);
+    }
+
+    var name = document.createElement("input");
+    name.className = "field__input extra-edit-row__name";
+    name.type = "text";
+    name.placeholder = "Extra name";
+    name.value = extra ? (extra.name || "") : "";
+
+    var price = document.createElement("input");
+    price.className = "field__input extra-edit-row__price";
+    price.type = "number";
+    price.min = "0";
+    price.step = "0.01";
+    price.inputMode = "decimal";
+    price.placeholder = "Price";
+    price.value = extra && typeof extra.price === "number" ? extra.price : "";
+
+    var max = document.createElement("input");
+    max.className = "field__input extra-edit-row__max";
+    max.type = "number";
+    max.min = "1";
+    max.step = "1";
+    max.inputMode = "numeric";
+    max.placeholder = "Max";
+    max.value = extra && typeof extra.maximumQuantity === "number" ? extra.maximumQuantity : "";
+    max.title = "Maximum quantity per order";
+
+    var remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "btn btn--danger extra-edit-row__remove";
+    remove.textContent = "Remove";
+    remove.addEventListener("click", function () { row.remove(); });
+
+    row.appendChild(name);
+    row.appendChild(price);
+    row.appendChild(max);
+    row.appendChild(remove);
+    return row;
+  }
+
+  function saveExtrasLibrary() {
+    if (!canManage()) {
+      showToast("You do not have access to manage extras.");
+      return;
+    }
+    var rows = elements.extrasEditorList.querySelectorAll(".extra-edit-row");
+    var extras = [];
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var name = row.querySelector(".extra-edit-row__name").value.trim();
+      var priceValue = row.querySelector(".extra-edit-row__price").value;
+      var maxValue = row.querySelector(".extra-edit-row__max").value;
+      if (!name) {
+        setExtrasError("Every extra needs a name (row " + (i + 1) + ").");
+        return;
+      }
+      if (!validation.isValidPrice(priceValue) || priceValue === "") {
+        setExtrasError("Enter a valid price for \"" + name + "\" (0 or more).");
+        return;
+      }
+      if (!validation.isPositiveInteger(maxValue)) {
+        setExtrasError("Enter a maximum quantity of 1 or more for \"" + name + "\".");
+        return;
+      }
+      extras.push({
+        id: row.getAttribute("data-extra-id") || createId("extra"),
+        name: name,
+        price: money.roundMoney(Number(priceValue)),
+        maximumQuantity: Number(maxValue),
+        active: true
+      });
+    }
+    storage.saveExtras(extras);
+    state.extras = extras;
+    // Keep any ticks the user already made in the product form, then refresh.
+    if (!elements.productModal.hidden) {
+      renderExtrasChecklist(collectCheckedExtras());
+    }
+    closeExtrasEditor();
+    showToast("Extras saved.");
   }
 
   /** Re-read the catalogue from storage and refresh POS rendering. */
