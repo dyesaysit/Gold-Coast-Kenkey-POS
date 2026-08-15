@@ -507,9 +507,9 @@
 
   /**
    * Render only the navigation items the current role may access
-   * (cashier: POS; supervisor: POS + history + reports; admin: all).
-   * This is the visible half of access control; the allowed list itself lives
-   * in the auth service.
+   * (cashier: POS; supervisor: POS, Products, Inventory, Sales History,
+   * Reports; admin: all sections). This is the visible half of access control;
+   * the allowed list itself lives in the auth service.
    */
   function renderNav() {
     elements.appNav.innerHTML = "";
@@ -550,7 +550,9 @@
       }
       return;
     }
-    showToast(item.label + " is coming in a later feature.");
+    // Defensive fallback for an unknown nav key; every real section is handled
+    // above.
+    showToast(item.label + " is not available.");
   }
 
   /** Lowest active portion price for a meal, used for the "From ..." label. */
@@ -2809,7 +2811,7 @@
       var month = String(date.getMonth() + 1).padStart(2, "0");
       var year = date.getFullYear();
       var time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      return day + "/" + month + "/" + year + " · " + time;
+      return day + "-" + month + "-" + year + " · " + time;
     } catch (error) {
       return iso;
     }

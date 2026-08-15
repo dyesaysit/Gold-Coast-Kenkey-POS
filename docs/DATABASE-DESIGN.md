@@ -197,6 +197,21 @@ Fields:
 | lowStockLevel | number | Yes | Warning threshold |
 | active | boolean | Yes | Visibility |
 
+### Product type and inventory contract
+
+In addition to the legacy `itemType` (kept for compatibility), every product now
+carries two explicit fields that drive behaviour:
+
+| Field | Type | Description |
+|---|---|---|
+| productType | string | `"configured-meal"` or `"simple"` |
+| trackInventory | boolean | Whether stock is tracked for this product |
+
+Stock logic depends on `trackInventory` alone — never on category or product
+name. Configured meals are never inventory-tracked (`trackInventory: false`,
+`stockQuantity`/`lowStockLevel` are `null`); simple products may be tracked, in
+which case they carry numeric `stockQuantity` and `lowStockLevel`.
+
 ## 9. Cart Item
 
 A cart item is temporary.
@@ -292,6 +307,24 @@ Fields:
 | total | number | Yes | Final total |
 | payment | object | Yes | Payment snapshot |
 | status | string | Yes | `completed` |
+
+### Payment snapshot
+
+The `payment` object records how the sale was paid. `method` is `"cash"` or
+`"momo"` and is saved on every sale.
+
+```javascript
+// Cash
+{ method: "cash", amountPaid: 100, change: 24 }
+
+// Mobile money (MoMo): amountPaid equals the total, no change, optional reference
+{ method: "momo", amountPaid: 76, change: 0, reference: "TXN-12345" }
+```
+
+The MoMo `reference` (transaction/reference number) is stored only for MoMo
+sales and may be an empty string. Sales also store a `receiptSettings` snapshot
+(business name, logo, contact, footer, paper width) so a reprinted receipt keeps
+the details that were current at the time of sale.
 
 ## 11. Sale Item Snapshot
 

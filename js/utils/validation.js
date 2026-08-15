@@ -51,9 +51,9 @@
   }
 
   /**
-   * Validate a cash checkout before it is allowed to complete.
-   * Returns the first problem found so the cashier sees one clear message.
-   * (Full checkout is a later feature; this shared validator is ready for it.)
+   * Validate a cash checkout before it is allowed to complete. Returns the
+   * first problem found so the cashier sees one clear message. Used by the cash
+   * payment path (MoMo pays the exact total, so it does not need this check).
    */
   function validateCheckout(cartItems, amountPaid) {
     if (isCartEmpty(cartItems)) {
