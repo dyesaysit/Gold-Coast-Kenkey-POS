@@ -29,6 +29,7 @@
   var inventoryReportPdf = global.GCK.inventoryReportPdf;
   var salesHistory = global.GCK.salesHistory;
   var backupService = global.GCK.backup;
+  var reprint = global.GCK.receiptReprint;
   var posCatalog = global.GCK.posCatalog;
 
   // In-memory view of catalogue data, loaded once from storage.
@@ -103,6 +104,18 @@
     elements.receiptContent = document.getElementById("receipt-content");
     elements.receiptDone = document.getElementById("receipt-done");
     elements.receiptPrint = document.getElementById("receipt-print");
+
+    // Reprint receipt modal
+    elements.reprintButton = document.getElementById("reprint-button");
+    elements.reprintModal = document.getElementById("reprint-modal");
+    elements.reprintOverlay = document.getElementById("reprint-overlay");
+    elements.reprintClose = document.getElementById("reprint-close");
+    elements.reprintSearch = document.getElementById("reprint-search");
+    elements.reprintError = document.getElementById("reprint-error");
+    elements.reprintRecent = document.getElementById("reprint-recent");
+    elements.reprintRecentList = document.getElementById("reprint-recent-list");
+    elements.reprintCancel = document.getElementById("reprint-cancel");
+    elements.reprintFind = document.getElementById("reprint-find");
 
     // Meal configuration modal
     elements.mealModal = document.getElementById("meal-modal");
@@ -2683,6 +2696,104 @@
     window.print();
   }
 
+  // --- Reprint receipt (cashier-safe) -------------------------------------
+  // Looks up one past sale by receipt number or reference and reuses the
+  // receipt renderer. Cashiers only reach their own sales (see the service);
+  // this does not open Sales History or expose totals/reports.
+
+  function bindReprintEvents() {
+    elements.reprintButton.addEventListener("click", openReprint);
+    elements.reprintFind.addEventListener("click", doReprintSearch);
+    elements.reprintCancel.addEventListener("click", closeReprint);
+    elements.reprintClose.addEventListener("click", closeReprint);
+    elements.reprintOverlay.addEventListener("click", closeReprint);
+    elements.reprintSearch.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        doReprintSearch();
+      }
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !elements.reprintModal.hidden) {
+        closeReprint();
+      }
+    });
+  }
+
+  function openReprint() {
+    elements.reprintSearch.value = "";
+    setReprintError("");
+    renderReprintRecent();
+    elements.reprintModal.hidden = false;
+    elements.reprintSearch.focus();
+  }
+
+  function closeReprint() {
+    elements.reprintModal.hidden = true;
+  }
+
+  function setReprintError(message) {
+    elements.reprintError.textContent = message;
+  }
+
+  function doReprintSearch() {
+    var result = reprint.findSale(elements.reprintSearch.value, currentUser);
+    if (result.status === "empty") {
+      setReprintError("Enter a receipt number or reference.");
+      return;
+    }
+    if (result.status === "not-found") {
+      setReprintError("No receipt found for that number or reference.");
+      return;
+    }
+    setReprintError("");
+    closeReprint();
+    showReceipt(result.sale, true); // reuse the existing receipt renderer
+  }
+
+  /**
+   * Today's sales the current user may reprint (their own, for cashiers). This
+   * is how a cashier finds a receipt when the customer did not keep the number:
+   * pick it from today's list instead of typing.
+   */
+  function renderReprintRecent() {
+    var recent = reprint.getRecentSales(currentUser, true, 8);
+    elements.reprintRecent.hidden = false;
+    elements.reprintRecentList.innerHTML = "";
+    if (recent.length === 0) {
+      var empty = document.createElement("p");
+      empty.className = "reprint-recent__empty";
+      empty.textContent = "No sales yet today.";
+      elements.reprintRecentList.appendChild(empty);
+      return;
+    }
+    for (var i = 0; i < recent.length; i++) {
+      elements.reprintRecentList.appendChild(buildReprintRecentItem(recent[i]));
+    }
+  }
+
+  function buildReprintRecentItem(sale) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "reprint-recent__item";
+
+    var receipt = document.createElement("span");
+    receipt.className = "reprint-recent__receipt";
+    receipt.textContent = sale.receiptNumber || "(no number)";
+
+    var time = document.createElement("span");
+    time.className = "reprint-recent__time";
+    time.textContent = formatSalesHistoryDateTime(sale.createdAt);
+
+    button.appendChild(receipt);
+    button.appendChild(time);
+    button.addEventListener("click", function () {
+      closeReprint();
+      showReceipt(sale, true);
+    });
+    return button;
+  }
+
   function renderReceipt(sale, isHistorical) {
     var settings = storage.getReceiptSettings(sale, state.settings);
     var container = elements.receiptContent;
@@ -2843,7 +2954,7 @@
     bindReportEvents();
     bindSalesHistoryEvents();
     bindCheckoutEvents();
-    window.addEventListener("resize", syncHeaderHeight);
+    bindReprintEvents();
 
     // POS content can be rendered while hidden; it is revealed after login.
     renderCategories();
