@@ -209,7 +209,7 @@ These are different cart items.
 
 ## 8. Checkout Requirements
 
-Version 1 supports cash payment.
+Version 1 supports two payment methods: cash and mobile money (MoMo).
 
 The checkout must:
 
@@ -226,11 +226,19 @@ The checkout must:
 11. Display the receipt.
 12. Prevent duplicate completion.
 
-Change formula:
+Change formula (cash only):
 
 ```text
 change = amount paid - sale total
 ```
+
+### Mobile money (MoMo)
+
+For MoMo the amount paid equals the sale total, so there is no change to
+calculate and no cash amount is required. An optional MoMo transaction/reference
+may be recorded. Every completed sale stores its payment method (`cash` or
+`momo`); the MoMo reference is stored only for MoMo sales. Version 1 has no real
+MoMo API integration — the reference is entered manually.
 
 ## 9. Inventory Requirements
 

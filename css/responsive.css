@@ -35,23 +35,36 @@
     height: 100%;
   }
 
+  /*
+   * Lock the POS to the viewport and turn the cart into a full-height sidebar
+   * that runs from just below the header down to the bottom, always visible.
+   * .app is the positioning context; --header-height is measured in app.js so
+   * the sidebar sits exactly under the header (96px fallback before measuring).
+   */
   .app {
+    position: relative;
     height: 100vh;
     min-height: 0;
     overflow: hidden;
   }
 
-  /* Products on the left, cart on the right; both fill the available height. */
+  /* Reserve the sidebar's width only while the POS (cart) screen is shown, so
+     management screens still use the full width. */
+  #pos-view[data-cart="on"] .app-nav,
+  #pos-view[data-cart="on"] .category-bar,
+  #pos-view[data-cart="on"] .app-main {
+    margin-right: var(--cart-width);
+  }
+
+  /* Products fill the left column and scroll on their own. */
   .app-main {
-    flex-direction: row;
-    align-items: stretch;
-    gap: var(--space-lg);
+    flex-direction: column;
+    gap: var(--space-md);
     padding: var(--space-lg);
     min-height: 0;
     overflow: hidden;
   }
 
-  /* The product section scrolls on its own. */
   .product-area {
     flex: 1 1 auto;
     min-width: 0;
@@ -64,14 +77,24 @@
   }
 
   /*
-   * Fixed-width cart panel. It is a flex column (from main.css): the title and
-   * the summary (totals + Checkout) keep their natural height and stay visible,
-   * while only the items list scrolls. No position: fixed/sticky is used.
+   * Cart sidebar: pinned to the right, full height below the header. It is a
+   * flex column (from main.css) so the title and summary (totals + Checkout)
+   * stay visible while only the item list scrolls. Because the cart lives
+   * inside .app-main, it is automatically hidden on management screens.
    */
   .cart {
-    flex: 0 0 340px;
+    position: absolute;
+    top: var(--header-height, 96px);
+    right: 0;
+    bottom: 0;
+    width: var(--cart-width);
+    margin: 0;
     min-height: 0;
-    overflow: hidden; /* clip the scrolling list to the rounded panel */
+    overflow: hidden;
+    border-radius: 0;
+    border-left: 1px solid var(--color-border);
+    box-shadow: -6px 0 16px rgba(0, 0, 0, 0.06);
+    z-index: 5;
   }
 
   .cart__items {

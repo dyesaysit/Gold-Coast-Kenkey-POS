@@ -106,7 +106,7 @@
             <span id="cart-total">GH₵0.00</span>
           </div>
           <!-- Enabled when the cart has items (managed in app.js renderCart). -->
-          <button class="btn btn--accent" id="checkout-button" type="button" disabled>
+          <button class="btn btn--primary cart__checkout" id="checkout-button" type="button" disabled>
             Checkout
           </button>
           <!-- Reprint a past receipt without opening Sales History (all roles). -->
@@ -400,9 +400,27 @@
         </label>
 
         <p class="field__note" id="pf-meal-note" hidden>
-          Configured meals are priced by their portions and are never
-          inventory-tracked. Portions are managed separately.
+          A configured meal is priced by its packages (sizes) below and is never
+          inventory-tracked. A simple product is just a name and one price.
         </p>
+
+        <!-- Packages (portions): only for configured meals -->
+        <div class="field pf-meal-only" id="pf-packages-section" hidden>
+          <span class="field__label">Packages / sizes</span>
+          <p class="field__note">Each package is a size or option with its own price and what it includes.</p>
+          <div class="pkg-list" id="pf-packages-list"></div>
+          <button class="btn btn--secondary pkg-add" id="pf-add-package" type="button">+ Add package</button>
+        </div>
+
+        <!-- Allowed extras: only for configured meals -->
+        <div class="field pf-meal-only" id="pf-extras-section" hidden>
+          <div class="pf-extras-head">
+            <span class="field__label">Allowed extras</span>
+            <button class="btn btn--secondary pf-extras-manage" id="pf-manage-extras" type="button">Manage extras…</button>
+          </div>
+          <p class="field__note">Tick the paid extras a customer can add to this meal.</p>
+          <div class="extras-check-list" id="pf-extras-list"></div>
+        </div>
 
         <label class="field" id="pf-price-field">
           <span class="field__label">Selling price (GH₵)</span>
@@ -453,6 +471,30 @@
         <div class="modal__actions">
           <button class="btn btn--secondary" id="pf-cancel" type="button">Cancel</button>
           <button class="btn btn--primary" id="pf-save" type="button">Save product</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Extras library: shared list of paid add-ons (Supervisor/Admin). -->
+  <div class="modal" id="extras-modal" hidden role="dialog" aria-modal="true"
+       aria-labelledby="extras-modal-title">
+    <div class="modal__overlay" id="extras-overlay"></div>
+    <div class="modal__panel" role="document">
+      <header class="modal__header">
+        <h2 class="modal__title" id="extras-modal-title">Extras library</h2>
+        <button class="modal__close" id="extras-close" type="button" aria-label="Close">&#10005;</button>
+      </header>
+      <div class="modal__body">
+        <p class="field__note">Extras are shared by every meal. Edit one here and it updates everywhere it is used.</p>
+        <div class="extras-editor" id="extras-editor-list"></div>
+        <button class="btn btn--secondary" id="extras-add" type="button">+ Add extra</button>
+        <p class="modal__error" id="extras-error" role="alert"></p>
+      </div>
+      <footer class="modal__footer">
+        <div class="modal__actions">
+          <button class="btn btn--secondary" id="extras-cancel" type="button">Cancel</button>
+          <button class="btn btn--primary" id="extras-save" type="button">Save extras</button>
         </div>
       </footer>
     </div>
