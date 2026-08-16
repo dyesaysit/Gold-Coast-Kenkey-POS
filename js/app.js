@@ -150,6 +150,7 @@
     elements.modalExtrasSection = document.getElementById("modal-extras-section");
     elements.modalExtras = document.getElementById("modal-extras");
     elements.modalTotal = document.getElementById("modal-total");
+    elements.modalSizeHint = document.getElementById("modal-size-hint");
     elements.modalError = document.getElementById("modal-error");
     elements.modalCancel = document.getElementById("modal-cancel");
     elements.modalAdd = document.getElementById("modal-add");
@@ -1325,6 +1326,10 @@
       basePrice, mealConfig.protein, getSelectedExtras()
     );
     elements.modalTotal.textContent = money.formatMoney(unitTotal);
+    // Nudge the cashier to pick a size while the price is still zero.
+    if (elements.modalSizeHint) {
+      elements.modalSizeHint.hidden = !!mealConfig.portion;
+    }
   }
 
   function setModalError(message) {
@@ -1652,6 +1657,7 @@
     // Menu editor: packages + extras library
     elements.pfAddPackage.addEventListener("click", function () {
       elements.pfPackagesList.appendChild(buildPackageRow(null));
+      refreshPackagesEmpty();
     });
     elements.pfManageExtras.addEventListener("click", openExtrasEditor);
     elements.extrasAdd.addEventListener("click", function () {
@@ -2145,12 +2151,26 @@
   /** Render the meal's packages as editable rows (empty for a new meal). */
   function renderPackages(product) {
     elements.pfPackagesList.innerHTML = "";
-    if (!product || !isConfiguredMeal(product)) {
-      return;
+    if (product && isConfiguredMeal(product)) {
+      var portions = getPortionsForMeal(product);
+      for (var i = 0; i < portions.length; i++) {
+        elements.pfPackagesList.appendChild(buildPackageRow(portions[i]));
+      }
     }
-    var portions = getPortionsForMeal(product);
-    for (var i = 0; i < portions.length; i++) {
-      elements.pfPackagesList.appendChild(buildPackageRow(portions[i]));
+    refreshPackagesEmpty();
+  }
+
+  /** Show a friendly empty-state when a meal has no packages yet. */
+  function refreshPackagesEmpty() {
+    var hasRows = !!elements.pfPackagesList.querySelector(".pkg-row");
+    var existing = elements.pfPackagesList.querySelector(".pkg-empty");
+    if (!hasRows && !existing) {
+      var hint = document.createElement("p");
+      hint.className = "field__note pkg-empty";
+      hint.textContent = "No packages yet — click “+ Add package” to add your first size.";
+      elements.pfPackagesList.appendChild(hint);
+    } else if (hasRows && existing) {
+      existing.remove();
     }
   }
 
@@ -2191,7 +2211,7 @@
     remove.type = "button";
     remove.className = "btn btn--danger pkg-remove";
     remove.textContent = "Remove";
-    remove.addEventListener("click", function () { row.remove(); });
+    remove.addEventListener("click", function () { row.remove(); refreshPackagesEmpty(); });
     foot.appendChild(remove);
 
     row.appendChild(grid);

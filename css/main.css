@@ -926,6 +926,13 @@ button.modal__close:hover {
   gap: var(--space-sm);
 }
 
+.modal__hint {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--font-small);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
 .modal__total {
   display: flex;
   justify-content: space-between;
