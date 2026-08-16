@@ -65,6 +65,12 @@
     overflow: hidden;
   }
 
+  /* The cart is a full-height sidebar here, so the mobile checkout bar is not
+     needed — hide it and drop the padding that reserved room for it. */
+  .pos-cta {
+    display: none;
+  }
+
   .product-area {
     flex: 1 1 auto;
     min-width: 0;

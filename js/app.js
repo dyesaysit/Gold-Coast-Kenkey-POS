@@ -104,6 +104,11 @@
     elements.cartTotal = document.getElementById("cart-total");
     elements.cartCount = document.getElementById("cart-count");
     elements.checkoutButton = document.getElementById("checkout-button");
+    elements.cart = document.getElementById("cart");
+    elements.posCta = document.getElementById("pos-cta");
+    elements.posCtaCount = document.getElementById("pos-cta-count");
+    elements.posCtaTotal = document.getElementById("pos-cta-total");
+    elements.posCtaCheckout = document.getElementById("pos-cta-checkout");
     elements.toast = document.getElementById("toast");
 
     // Checkout modal
@@ -1548,6 +1553,14 @@
     elements.cartSubtotal.textContent = money.formatMoney(subtotal);
     elements.cartTotal.textContent = money.formatMoney(total);
     elements.checkoutButton.disabled = empty; // no checkout with an empty cart
+
+    // Mirror the total onto the mobile sticky checkout bar, and hide it while
+    // the cart is empty (CSS keeps it hidden on desktop regardless).
+    if (elements.posCta) {
+      elements.posCta.hidden = empty;
+      elements.posCtaCount.textContent = itemCount + (itemCount === 1 ? " item" : " items");
+      elements.posCtaTotal.textContent = money.formatMoney(total);
+    }
   }
 
   function buildCartLine(item) {
@@ -3262,6 +3275,9 @@
 
   function bindCheckoutEvents() {
     elements.checkoutButton.addEventListener("click", openCheckout);
+    if (elements.posCtaCheckout) {
+      elements.posCtaCheckout.addEventListener("click", reviewCart);
+    }
     elements.payCash.addEventListener("click", function () { selectMethod("cash"); });
     elements.payMomo.addEventListener("click", function () { selectMethod("momo"); });
     elements.checkoutAmount.addEventListener("input", updateChange);
@@ -3303,6 +3319,23 @@
 
   function closeCheckout() {
     elements.checkoutModal.hidden = true;
+  }
+
+  // The mobile sticky bar reviews the order before payment: the cart stacks
+  // below the menu on phones, so scroll it into view and briefly highlight it
+  // so the cashier confirms the items first. The cart's own Checkout button is
+  // then the deliberate step that opens payment.
+  function reviewCart() {
+    if (validation.isCartEmpty(state.cart)) {
+      showToast("The cart is empty. Add an item before checkout.");
+      return;
+    }
+    if (!elements.cart) { return; }
+    elements.cart.scrollIntoView({ behavior: "smooth", block: "start" });
+    elements.cart.classList.add("cart--review");
+    global.setTimeout(function () {
+      elements.cart.classList.remove("cart--review");
+    }, 900);
   }
 
   function selectMethod(method) {

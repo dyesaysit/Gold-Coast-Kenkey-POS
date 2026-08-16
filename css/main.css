@@ -231,6 +231,9 @@ body {
   flex-direction: column;
   gap: var(--space-md);
   padding: var(--space-md);
+  /* Room for the fixed mobile checkout bar so it never covers the last row.
+     Reset to a normal pad on desktop (responsive.css) where the bar is hidden. */
+  padding-bottom: 88px;
 }
 
 .section-title {
@@ -271,7 +274,7 @@ body {
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 170px;
+  min-height: 140px; /* compact on phones; tablet/desktop grow the image separately */
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background-color: var(--color-surface);
@@ -324,7 +327,7 @@ body {
 }
 
 .product-tile__image {
-  height: 110px;
+  height: 88px;
   background-color: var(--color-background);
   display: flex;
   align-items: center;
@@ -362,7 +365,7 @@ body {
 
 .product-tile__placeholder::before {
   content: "🍽️";
-  font-size: 34px;
+  font-size: 26px;
   opacity: 0.4;
 }
 
@@ -393,6 +396,71 @@ body {
 .product-tile__stock--low {
   color: var(--color-warning);
   font-weight: bold;
+}
+
+/*
+ * Mobile sticky checkout bar. On phones and tablets the cart stacks under the
+ * product grid, so this pinned bar keeps the running total and a Checkout tap
+ * always in reach. Shown only below 1024px (responsive.css hides it on desktop,
+ * where the cart is a full-height sidebar). The [hidden] attribute (toggled in
+ * app.js when the cart is empty) still wins because of the rule below.
+ */
+.pos-cta {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  padding-bottom: calc(var(--space-sm) + env(safe-area-inset-bottom, 0px));
+  background-color: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  box-shadow: 0 -6px 16px rgba(20, 83, 45, 0.12);
+}
+
+.pos-cta[hidden] {
+  display: none;
+}
+
+.pos-cta__info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.pos-cta__count {
+  font-size: var(--font-small);
+  color: var(--color-text-muted);
+}
+
+.pos-cta__total {
+  font-size: var(--font-price);
+  font-weight: bold;
+  color: var(--color-primary-dark);
+}
+
+.pos-cta__btn {
+  flex: 0 0 auto;
+  min-width: 140px;
+}
+
+/* Brief highlight when the mobile "Review order" bar scrolls the cart in. */
+.cart--review {
+  animation: cart-review-pulse 0.9s ease;
+}
+
+@keyframes cart-review-pulse {
+  30% { box-shadow: 0 0 0 4px rgba(20, 83, 45, 0.25); }
+  100% { box-shadow: 0 0 0 0 rgba(20, 83, 45, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cart--review { animation: none; }
 }
 
 /* --- Cart ---------------------------------------------------------------- */
