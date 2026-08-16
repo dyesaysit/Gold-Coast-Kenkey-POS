@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Content-Security-Policy: the app loads only its own local scripts/styles
+       and uses data: URIs for images. Blocking inline/remote scripts is the main
+       defence against injected (stored-XSS) content. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+  <meta name="referrer" content="no-referrer" />
   <title>Point of Sale</title>
 
   <!-- Design tokens first, then base layout, then responsive breakpoints. -->

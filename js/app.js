@@ -46,6 +46,12 @@
 
   var currentUser = null; // session snapshot { id, name, role } or null
   var pinBuffer = ""; // digits entered on the login pad
+  var failedPinAttempts = 0; // consecutive wrong PIN entries
+  var pinLockUntil = 0; // timestamp until which the pad is locked
+  var MAX_PIN_ATTEMPTS = 5;
+  var PIN_LOCK_MS = 30000;
+  var IDLE_LOGOUT_MS = 15 * 60 * 1000; // auto-logout an unattended till
+  var idleTimer = null;
   var activeNavKey = "pos"; // only the POS screen exists at this stage
 
   var elements = {};
@@ -451,7 +457,15 @@
     });
   }
 
+  function pinLockRemainingMs() {
+    return Math.max(0, pinLockUntil - Date.now());
+  }
+
   function pressDigit(digit) {
+    if (pinLockRemainingMs() > 0) {
+      setLoginError("Too many attempts. Try again in " + Math.ceil(pinLockRemainingMs() / 1000) + "s.");
+      return;
+    }
     if (pinBuffer.length >= auth.MAX_PIN_LENGTH) {
       return; // enforce the 6-digit maximum
     }
@@ -504,21 +518,47 @@
   function attemptLogin() {
     var result = auth.login(pinBuffer); // persists the session only on success
     if (result.valid) {
+      failedPinAttempts = 0;
+      pinLockUntil = 0;
       currentUser = result.user;
       clearPin();
       showPos();
       showToast("Welcome, " + currentUser.name + ".");
     } else if (pinBuffer.length >= auth.MAX_PIN_LENGTH) {
-      setLoginError(result.message);
       pinBuffer = "";
       renderPinDots();
+      failedPinAttempts += 1;
+      // After repeated wrong PINs, lock the pad briefly to slow guessing.
+      if (failedPinAttempts >= MAX_PIN_ATTEMPTS) {
+        failedPinAttempts = 0;
+        pinLockUntil = Date.now() + PIN_LOCK_MS;
+        setLoginError("Too many attempts. Locked for " + (PIN_LOCK_MS / 1000) + " seconds.");
+      } else {
+        setLoginError(result.message);
+      }
     }
   }
 
   function handleLogout() {
     auth.logout();
     currentUser = null;
+    resetIdleTimer(); // clears the pending timer now that no one is signed in
     showLogin();
+  }
+
+  /**
+   * Auto-logout after a period of no activity, so an unattended till does not
+   * stay open. The cart persists in storage, so no in-progress sale is lost.
+   */
+  function resetIdleTimer() {
+    if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+    if (!currentUser) { return; }
+    idleTimer = setTimeout(function () {
+      if (currentUser) {
+        handleLogout();
+        showToast("Signed out after 15 minutes of inactivity.");
+      }
+    }, IDLE_LOGOUT_MS);
   }
 
   // --- View switching ------------------------------------------------------
@@ -529,6 +569,7 @@
     renderUserArea();
     showSection(defaultNavKeyFor(currentUser));
     syncHeaderHeight();
+    resetIdleTimer();
   }
 
   /** Measure the header so the desktop cart sidebar sits just below it. */
@@ -2918,6 +2959,12 @@
       elements.backupError.textContent = "Choose a JSON backup file.";
       return;
     }
+    // A real POS backup is well under this; reject oversized files up front so a
+    // huge/malicious file cannot hang the app during read/parse.
+    if (file.size > 15 * 1024 * 1024) {
+      elements.backupError.textContent = "That file is too large to be a POS backup (max 15 MB).";
+      return;
+    }
     file.text().then(function (text) {
       var result = backupService.parseBackup(currentUser && currentUser.role, text);
       if (!result.ok) { elements.backupError.textContent = result.message; return; }
@@ -3628,6 +3675,9 @@
     bindCheckoutEvents();
     bindReprintEvents();
     bindSetupEvents();
+    ["pointerdown", "keydown"].forEach(function (evt) {
+      document.addEventListener(evt, resetIdleTimer, { passive: true });
+    });
 
     // First launch (no settings/users yet): run the setup wizard instead of
     // seeding a fixed menu, so any business can start with its own details.
