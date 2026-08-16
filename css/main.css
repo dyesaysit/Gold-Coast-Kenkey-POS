@@ -449,6 +449,20 @@ body {
   min-width: 140px;
 }
 
+/* Brief highlight when the mobile "Review order" bar scrolls the cart in. */
+.cart--review {
+  animation: cart-review-pulse 0.9s ease;
+}
+
+@keyframes cart-review-pulse {
+  30% { box-shadow: 0 0 0 4px rgba(20, 83, 45, 0.25); }
+  100% { box-shadow: 0 0 0 0 rgba(20, 83, 45, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cart--review { animation: none; }
+}
+
 /* --- Cart ---------------------------------------------------------------- */
 .cart {
   background-color: var(--color-surface);
