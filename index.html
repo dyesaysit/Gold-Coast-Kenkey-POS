@@ -459,14 +459,16 @@
         </label>
 
         <p class="field__note" id="pf-meal-note" hidden>
-          A configured meal is priced by its packages (sizes) below and is never
-          inventory-tracked. A simple product is just a name and one price.
+          Set this meal up in 2 steps: <strong>1)</strong> add its packages (sizes)
+          below, <strong>2)</strong> tick any extras. The price comes from the
+          packages, so a meal needs at least one before it can be sold. (A simple
+          product is just a name and one price instead.)
         </p>
 
         <!-- Packages (portions): only for configured meals -->
         <div class="field pf-meal-only" id="pf-packages-section" hidden>
           <span class="field__label">Packages / sizes</span>
-          <p class="field__note">Each package is a size or option with its own price and what it includes.</p>
+          <p class="field__note">One row per size. Give each a name, a price, and what's included — e.g. name "Regular", included "3 scoops + 1 protein". Use "+ Add package" for another size.</p>
           <div class="pkg-list" id="pf-packages-list"></div>
           <button class="btn btn--secondary pkg-add" id="pf-add-package" type="button">+ Add package</button>
         </div>
@@ -477,7 +479,7 @@
             <span class="field__label">Allowed extras</span>
             <button class="btn btn--secondary pf-extras-manage" id="pf-manage-extras" type="button">Manage extras…</button>
           </div>
-          <p class="field__note">Tick the paid extras a customer can add to this meal.</p>
+          <p class="field__note">Optional. Tick the add-ons a customer can add to this meal. Don't see one? Click "Manage extras…" to create or edit the shared list (name, price, max per order).</p>
           <div class="extras-check-list" id="pf-extras-list"></div>
         </div>
 
