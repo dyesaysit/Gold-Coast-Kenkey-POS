@@ -104,6 +104,10 @@
     elements.cartTotal = document.getElementById("cart-total");
     elements.cartCount = document.getElementById("cart-count");
     elements.checkoutButton = document.getElementById("checkout-button");
+    elements.posCta = document.getElementById("pos-cta");
+    elements.posCtaCount = document.getElementById("pos-cta-count");
+    elements.posCtaTotal = document.getElementById("pos-cta-total");
+    elements.posCtaCheckout = document.getElementById("pos-cta-checkout");
     elements.toast = document.getElementById("toast");
 
     // Checkout modal
@@ -1548,6 +1552,14 @@
     elements.cartSubtotal.textContent = money.formatMoney(subtotal);
     elements.cartTotal.textContent = money.formatMoney(total);
     elements.checkoutButton.disabled = empty; // no checkout with an empty cart
+
+    // Mirror the total onto the mobile sticky checkout bar, and hide it while
+    // the cart is empty (CSS keeps it hidden on desktop regardless).
+    if (elements.posCta) {
+      elements.posCta.hidden = empty;
+      elements.posCtaCount.textContent = itemCount + (itemCount === 1 ? " item" : " items");
+      elements.posCtaTotal.textContent = money.formatMoney(total);
+    }
   }
 
   function buildCartLine(item) {
@@ -3262,6 +3274,9 @@
 
   function bindCheckoutEvents() {
     elements.checkoutButton.addEventListener("click", openCheckout);
+    if (elements.posCtaCheckout) {
+      elements.posCtaCheckout.addEventListener("click", openCheckout);
+    }
     elements.payCash.addEventListener("click", function () { selectMethod("cash"); });
     elements.payMomo.addEventListener("click", function () { selectMethod("momo"); });
     elements.checkoutAmount.addEventListener("input", updateChange);

@@ -179,6 +179,20 @@
           </button>
         </div>
       </aside>
+
+      <!-- Mobile sticky checkout: on phones the cart stacks below the menu, so
+           this keeps the running total and Checkout pinned to the bottom of the
+           screen, one tap away, however far the menu is scrolled. Hidden on
+           desktop, where the cart is already a full-height sidebar. -->
+      <div class="pos-cta" id="pos-cta" hidden>
+        <div class="pos-cta__info">
+          <span class="pos-cta__count" id="pos-cta-count">0 items</span>
+          <span class="pos-cta__total" id="pos-cta-total">0.00</span>
+        </div>
+        <button class="btn btn--primary pos-cta__btn" id="pos-cta-checkout" type="button">
+          Checkout
+        </button>
+      </div>
     </main>
 
     <!-- Product & inventory management (Supervisor/Admin). Hidden by default;
