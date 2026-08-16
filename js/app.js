@@ -56,6 +56,25 @@
   function getElements() {
     // Login view
     elements.loginView = document.getElementById("login-view");
+
+    // First-run setup wizard
+    elements.setupView = document.getElementById("setup-view");
+    elements.setupBusinessName = document.getElementById("setup-business-name");
+    elements.setupPin = document.getElementById("setup-pin");
+    elements.setupPinConfirm = document.getElementById("setup-pin-confirm");
+    elements.setupCurrencyCode = document.getElementById("setup-currency-code");
+    elements.setupCurrencySymbol = document.getElementById("setup-currency-symbol");
+    elements.setupPhone = document.getElementById("setup-phone");
+    elements.setupAddress = document.getElementById("setup-address");
+    elements.setupLogoPreview = document.getElementById("setup-logo-preview");
+    elements.setupLogoFile = document.getElementById("setup-logo-file");
+    elements.setupLogoChoose = document.getElementById("setup-logo-choose");
+    elements.setupLogoRemove = document.getElementById("setup-logo-remove");
+    elements.setupError = document.getElementById("setup-error");
+    elements.setupSubmit = document.getElementById("setup-submit");
+    // Currency labels driven from settings
+    elements.pfPriceLabel = document.getElementById("pf-price-label");
+    elements.checkoutAmountLabel = document.getElementById("checkout-amount-label");
     elements.loginLogo = document.getElementById("login-logo");
     elements.loginBusiness = document.getElementById("login-business");
     elements.pinDots = document.getElementById("pin-dots");
@@ -143,6 +162,16 @@
     elements.manageTitle = document.getElementById("manage-title");
     elements.manageAdd = document.getElementById("manage-add");
     elements.manageClose = document.getElementById("manage-close");
+    elements.manageCategories = document.getElementById("manage-categories");
+    // Category editor modal
+    elements.categoryModal = document.getElementById("category-modal");
+    elements.categoryOverlay = document.getElementById("category-overlay");
+    elements.categoryClose = document.getElementById("category-close");
+    elements.categoryEditorList = document.getElementById("category-editor-list");
+    elements.categoryAdd = document.getElementById("category-add");
+    elements.categoryError = document.getElementById("category-error");
+    elements.categoryCancel = document.getElementById("category-cancel");
+    elements.categorySave = document.getElementById("category-save");
     elements.manageHint = document.getElementById("manage-hint");
     elements.manageList = document.getElementById("manage-list");
     elements.inventoryPrintFormat = document.getElementById("inventory-print-format");
@@ -343,6 +372,25 @@
     document.title = (name ? name + " · " : "") + "Point of Sale";
     renderLogo(elements.headerLogo, settings);
     renderLogo(elements.loginLogo, settings);
+    applyCurrencyLabels();
+  }
+
+  /** Put the settings currency symbol into static labels/placeholders so no
+   *  currency is hard-coded in the markup. */
+  function applyCurrencyLabels() {
+    var symbol = (state.settings && state.settings.currencySymbol) || money.getCurrencySymbol() || "";
+    if (elements.pfPriceLabel) {
+      elements.pfPriceLabel.textContent = symbol ? "Selling price (" + symbol + ")" : "Selling price";
+    }
+    if (elements.checkoutAmountLabel) {
+      elements.checkoutAmountLabel.textContent = symbol ? "Amount received (" + symbol + ")" : "Amount received";
+    }
+    var zero = money.formatMoney(0);
+    ["cart-subtotal", "cart-total", "modal-total", "checkout-total", "checkout-change",
+     "reports-revenue", "reports-cash", "reports-momo", "sales-history-total"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) { el.textContent = zero; }
+    });
   }
 
   /**
@@ -532,9 +580,168 @@
   }
 
   function showLogin() {
+    elements.setupView.hidden = true;
     elements.posView.hidden = true;
     elements.loginView.hidden = false;
     clearPin();
+  }
+
+  // --- First-run setup wizard ---------------------------------------------
+  // Shown once, before any account exists. Collects branding + admin PIN and
+  // seeds a small sample catalogue so a new business can start immediately.
+
+  var setupLogo = "";
+
+  function needsSetup() {
+    var settings = storage.getSettings();
+    var users = storage.getCashiers();
+    return !settings || !Array.isArray(users) || users.length === 0;
+  }
+
+  function showSetup() {
+    elements.loginView.hidden = true;
+    elements.posView.hidden = true;
+    elements.setupView.hidden = false;
+    setSetupLogo("");
+    elements.setupError.textContent = "";
+    elements.setupBusinessName.focus();
+  }
+
+  function setSetupError(message) { elements.setupError.textContent = message; }
+
+  function bindSetupEvents() {
+    elements.setupSubmit.addEventListener("click", completeSetup);
+    elements.setupLogoChoose.addEventListener("click", function () { elements.setupLogoFile.click(); });
+    elements.setupLogoRemove.addEventListener("click", function () { setSetupLogo(""); });
+    elements.setupLogoFile.addEventListener("change", function (event) {
+      var file = event.target.files && event.target.files[0];
+      event.target.value = "";
+      handleSetupLogo(file);
+    });
+    elements.setupPinConfirm.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") { event.preventDefault(); completeSetup(); }
+    });
+  }
+
+  function setSetupLogo(value) {
+    setupLogo = value || "";
+    elements.setupLogoPreview.innerHTML = "";
+    if (setupLogo) {
+      var img = document.createElement("img");
+      img.src = setupLogo;
+      img.alt = "Logo preview";
+      elements.setupLogoPreview.appendChild(img);
+      elements.setupLogoChoose.textContent = "Replace logo";
+      elements.setupLogoRemove.hidden = false;
+    } else {
+      var span = document.createElement("span");
+      span.className = "image-picker__empty";
+      span.textContent = "No logo";
+      elements.setupLogoPreview.appendChild(span);
+      elements.setupLogoChoose.textContent = "Choose logo";
+      elements.setupLogoRemove.hidden = true;
+    }
+  }
+
+  function handleSetupLogo(file) {
+    if (!file) { return; }
+    if (["image/jpeg", "image/png", "image/webp", "image/gif"].indexOf(file.type) === -1) {
+      setSetupError("Unsupported image. Use JPG, PNG, WebP or GIF.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setSetupError("Logo is too large. Maximum size is 5 MB.");
+      return;
+    }
+    setSetupError("");
+    compressImage(file, function (error, dataUrl) {
+      if (error) { setSetupError("Could not read that image. Try another file."); return; }
+      setSetupLogo(dataUrl);
+    });
+  }
+
+  function deriveShortName(name) {
+    var words = String(name || "").split(/\s+/).filter(Boolean);
+    var initials = words.map(function (w) { return w.charAt(0); }).join("").toUpperCase();
+    return (initials || String(name || "").slice(0, 3).toUpperCase() || "POS").slice(0, 4);
+  }
+
+  function completeSetup() {
+    var name = elements.setupBusinessName.value.trim();
+    var pin = elements.setupPin.value.trim();
+    var confirmPin = elements.setupPinConfirm.value.trim();
+    var currencyCode = elements.setupCurrencyCode.value.trim();
+    var currencySymbol = elements.setupCurrencySymbol.value.trim();
+
+    if (!name) { setSetupError("Enter your restaurant / business name."); return; }
+    if (!/^[0-9]{4,6}$/.test(pin)) { setSetupError("Admin PIN must be 4–6 digits."); return; }
+    if (pin !== confirmPin) { setSetupError("The two PINs do not match."); return; }
+    if (!currencySymbol) { setSetupError("Enter a currency symbol (e.g. GH₵, $, ₦)."); return; }
+
+    var shortName = deriveShortName(name);
+    var settings = {
+      businessName: name,
+      shortName: shortName,
+      logo: setupLogo || "",
+      phone: elements.setupPhone.value.trim(),
+      address: elements.setupAddress.value.trim(),
+      currencyCode: currencyCode || currencySymbol,
+      currencySymbol: currencySymbol,
+      receiptPrefix: shortName,
+      receiptFooterNote: "Thank you!",
+      receiptExtraInfo: "",
+      receiptPaperWidth: "80mm",
+      dataVersion: 2,
+      setupComplete: true
+    };
+    storage.saveSettings(settings);
+
+    var admin = { id: createId("user"), name: "Admin", pin: pin, role: "admin", active: true };
+    storage.saveCashiers([admin]);
+    seedSampleCatalogue();
+    storage.clearCurrentCart();
+
+    // Load the new data, apply currency, and sign the admin in.
+    loadState();
+    money.setCurrencySymbol(settings.currencySymbol);
+    applyBranding();
+    renderCategories();
+    renderProducts();
+    renderCart();
+    auth.login(pin);
+    currentUser = auth.getCurrentUser();
+    elements.setupView.hidden = true;
+    showPos();
+    showToast("Setup complete. Welcome, " + name + "!");
+  }
+
+  /** Seed one editable category + a few simple sample products (if empty). */
+  function seedSampleCatalogue() {
+    if (storage.getCategories().length > 0 || storage.getProducts().length > 0) { return; }
+    var categoryId = createId("cat");
+    storage.saveCategories([
+      { id: categoryId, name: "Sample Menu", displayOrder: 1, active: true }
+    ]);
+    var samples = [
+      { name: "Sample Meal", price: 25 },
+      { name: "Bottled Water", price: 3 },
+      { name: "Soft Drink", price: 10 }
+    ];
+    for (var i = 0; i < samples.length; i++) {
+      storage.saveProduct({
+        id: createId("product"),
+        name: samples[i].name,
+        categoryId: categoryId,
+        productType: "simple",
+        itemType: "inventory-product",
+        image: "",
+        sellingPrice: samples[i].price,
+        trackInventory: false,
+        stockQuantity: null,
+        lowStockLevel: null,
+        active: true
+      });
+    }
   }
 
   function renderUserArea() {
@@ -1459,6 +1666,21 @@
         closeExtrasEditor();
       }
     });
+
+    // Category editor
+    elements.manageCategories.addEventListener("click", openCategoryEditor);
+    elements.categoryAdd.addEventListener("click", function () {
+      elements.categoryEditorList.appendChild(buildCategoryEditRow(null));
+    });
+    elements.categorySave.addEventListener("click", saveCategoryEditor);
+    elements.categoryCancel.addEventListener("click", closeCategoryEditor);
+    elements.categoryClose.addEventListener("click", closeCategoryEditor);
+    elements.categoryOverlay.addEventListener("click", closeCategoryEditor);
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !elements.categoryModal.hidden) {
+        closeCategoryEditor();
+      }
+    });
   }
 
   function closeManagementPage() {
@@ -1479,6 +1701,8 @@
     var isInventory = (key === "inventory");
     elements.manageTitle.textContent = isInventory ? "Inventory & Stock" : "Products";
     elements.manageAdd.hidden = isInventory; // the stock view does not add products
+    // Category management is Admin-only and only on the Products screen.
+    elements.manageCategories.hidden = isInventory || !isAdmin();
     elements.inventoryPrintFormat.hidden = !isInventory;
     elements.inventoryPrint.hidden = !isInventory;
     elements.inventoryExportPdf.hidden = !isInventory;
@@ -1488,6 +1712,91 @@
       : "Add or edit products. Configured meals are priced by their portions.";
     if (isInventory) { renderInventoryReport(); }
     renderManageList(key);
+  }
+
+  // --- Category editor (Admin only) ---------------------------------------
+
+  function openCategoryEditor() {
+    if (!isAdmin()) { showToast("Admin access is required."); return; }
+    setCategoryError("");
+    renderCategoryEditor(storage.getCategories());
+    elements.categoryModal.hidden = false;
+  }
+
+  function closeCategoryEditor() { elements.categoryModal.hidden = true; }
+  function setCategoryError(message) { elements.categoryError.textContent = message; }
+
+  function renderCategoryEditor(categories) {
+    elements.categoryEditorList.innerHTML = "";
+    var sorted = categories.slice().sort(function (a, b) {
+      return (a.displayOrder || 0) - (b.displayOrder || 0);
+    });
+    for (var i = 0; i < sorted.length; i++) {
+      elements.categoryEditorList.appendChild(buildCategoryEditRow(sorted[i]));
+    }
+  }
+
+  function buildCategoryEditRow(category) {
+    var row = document.createElement("div");
+    row.className = "cat-edit-row";
+    if (category && category.id) { row.setAttribute("data-category-id", category.id); }
+
+    var name = document.createElement("input");
+    name.className = "field__input cat-edit-row__name";
+    name.type = "text";
+    name.placeholder = "Category name";
+    name.value = category ? (category.name || "") : "";
+
+    var activeLabel = document.createElement("label");
+    activeLabel.className = "cat-edit-row__active";
+    var active = document.createElement("input");
+    active.type = "checkbox";
+    active.checked = category ? category.active !== false : true;
+    activeLabel.appendChild(active);
+    activeLabel.appendChild(document.createTextNode("Visible"));
+
+    var remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "btn btn--danger cat-edit-row__remove";
+    remove.textContent = "Remove";
+    remove.addEventListener("click", function () { row.remove(); });
+
+    row.appendChild(name);
+    row.appendChild(activeLabel);
+    row.appendChild(remove);
+    return row;
+  }
+
+  function saveCategoryEditor() {
+    if (!isAdmin()) { showToast("Admin access is required."); return; }
+    var rows = elements.categoryEditorList.querySelectorAll(".cat-edit-row");
+    var categories = [];
+    var seen = {};
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var name = row.querySelector(".cat-edit-row__name").value.trim();
+      if (!name) {
+        setCategoryError("Every category needs a name (row " + (i + 1) + ").");
+        return;
+      }
+      var key = name.toLowerCase();
+      if (seen[key]) {
+        setCategoryError("Duplicate category name: \"" + name + "\".");
+        return;
+      }
+      seen[key] = true;
+      categories.push({
+        id: row.getAttribute("data-category-id") || createId("cat"),
+        name: name,
+        displayOrder: i + 1,
+        active: row.querySelector(".cat-edit-row__active input").checked
+      });
+    }
+    storage.saveCategories(categories);
+    state.activeCategoryId = "all"; // a filtered category may have been removed
+    reloadCatalogue();             // refresh chips + product-form dropdown
+    closeCategoryEditor();
+    showToast("Categories saved.");
   }
 
   function renderInventoryReport() {
@@ -2424,14 +2733,53 @@
     meta.textContent = titleCase(user.role) + " · PIN •••• · " + (user.active ? "Active" : "Inactive");
     info.appendChild(name);
     info.appendChild(meta);
+    var actions = document.createElement("div");
+    actions.className = "manage-row__actions";
     var edit = document.createElement("button");
     edit.type = "button";
     edit.className = "btn btn--secondary";
     edit.textContent = "Edit";
     edit.addEventListener("click", function () { openUserForm(user); });
+    actions.appendChild(edit);
+    // Delete is Admin-only (the Users page is already admin-gated).
+    var del = document.createElement("button");
+    del.type = "button";
+    del.className = "btn btn--danger";
+    del.textContent = "Delete";
+    del.addEventListener("click", function () { deleteUser(user); });
+    actions.appendChild(del);
     row.appendChild(info);
-    row.appendChild(edit);
+    row.appendChild(actions);
     return row;
+  }
+
+  /** Delete a user (Admin only). Protects the signed-in admin and the last admin. */
+  function deleteUser(user) {
+    if (!isAdmin()) { showToast("Admin access is required."); return; }
+    if (currentUser && user.id === currentUser.id) {
+      showToast("You cannot delete your own account.");
+      return;
+    }
+    var users = storage.getCashiers();
+    if (user.role === "admin") {
+      var otherActiveAdmins = users.filter(function (u) {
+        return u.role === "admin" && u.id !== user.id && u.active !== false;
+      });
+      if (otherActiveAdmins.length === 0) {
+        showToast("At least one active admin is required.");
+        return;
+      }
+    }
+    if (!window.confirm("Delete user \"" + user.name + "\"? This cannot be undone.")) {
+      return;
+    }
+    var remaining = users.filter(function (u) { return u.id !== user.id; });
+    if (!storage.saveCashiers(remaining)) {
+      showToast("Could not delete the user.");
+      return;
+    }
+    renderUsers();
+    showToast("User deleted.");
   }
 
   function titleCase(value) {
@@ -3250,9 +3598,6 @@
 
   function init() {
     getElements();
-    storage.seedInitialData(); // writes seed data only on first launch
-    loadState();
-    applyBranding();
     bindAuthEvents();
     bindPosEvents();
     bindModalEvents();
@@ -3262,6 +3607,18 @@
     bindSalesHistoryEvents();
     bindCheckoutEvents();
     bindReprintEvents();
+    bindSetupEvents();
+
+    // First launch (no settings/users yet): run the setup wizard instead of
+    // seeding a fixed menu, so any business can start with its own details.
+    if (needsSetup()) {
+      showSetup();
+      return;
+    }
+
+    storage.seedInitialData(); // tops up any missing keys on an existing install
+    loadState();
+    applyBranding();
 
     // POS content can be rendered while hidden; it is revealed after login.
     renderCategories();
