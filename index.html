@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Content-Security-Policy: the app loads only its own local scripts/styles
+       and uses data: URIs for images. Blocking inline/remote scripts is the main
+       defence against injected (stored-XSS) content. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+  <meta name="referrer" content="no-referrer" />
   <title>Point of Sale</title>
 
   <!-- Design tokens first, then base layout, then responsive breakpoints. -->
@@ -11,6 +17,64 @@
   <link rel="stylesheet" href="css/responsive.css" />
 </head>
 <body>
+  <!-- FIRST-RUN SETUP: shown once, before any account/settings exist. -->
+  <section class="login setup-view" id="setup-view" hidden aria-label="First-time setup">
+    <div class="login__card setup-card">
+      <h1 class="login__business">Set up your POS</h1>
+      <p class="login__prompt">A few details to get your business started.</p>
+      <form class="setup-form" id="setup-form" novalidate>
+        <label class="field">
+          <span class="field__label">Restaurant / business name</span>
+          <input class="field__input" id="setup-business-name" type="text" autocomplete="off" />
+        </label>
+        <div class="setup-form__row">
+          <label class="field">
+            <span class="field__label">Admin PIN (4–6 digits)</span>
+            <input class="field__input" id="setup-pin" type="password" inputmode="numeric" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span class="field__label">Confirm PIN</span>
+            <input class="field__input" id="setup-pin-confirm" type="password" inputmode="numeric" autocomplete="off" />
+          </label>
+        </div>
+        <div class="setup-form__row">
+          <label class="field">
+            <span class="field__label">Currency code</span>
+            <input class="field__input" id="setup-currency-code" type="text" autocomplete="off" placeholder="e.g. GHS" />
+          </label>
+          <label class="field">
+            <span class="field__label">Currency symbol</span>
+            <input class="field__input" id="setup-currency-symbol" type="text" autocomplete="off" placeholder="e.g. GH₵" />
+          </label>
+        </div>
+        <label class="field">
+          <span class="field__label">Phone (optional)</span>
+          <input class="field__input" id="setup-phone" type="text" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span class="field__label">Address (optional)</span>
+          <input class="field__input" id="setup-address" type="text" autocomplete="off" />
+        </label>
+        <div class="field">
+          <span class="field__label">Logo (optional)</span>
+          <div class="image-picker">
+            <div class="image-picker__preview setup-logo-preview" id="setup-logo-preview">
+              <span class="image-picker__empty">No logo</span>
+            </div>
+            <div class="image-picker__actions">
+              <input id="setup-logo-file" type="file" accept="image/*" class="visually-hidden" />
+              <button class="btn btn--secondary" id="setup-logo-choose" type="button">Choose logo</button>
+              <button class="btn btn--secondary" id="setup-logo-remove" type="button" hidden>Remove</button>
+            </div>
+          </div>
+        </div>
+        <p class="login__error" id="setup-error" role="alert"></p>
+        <button class="btn btn--primary btn--block" id="setup-submit" type="button">Create my POS</button>
+        <p class="field__note">You'll start with a sample category and a few sample products you can edit or delete.</p>
+      </form>
+    </div>
+  </section>
+
   <!-- LOGIN VIEW: shown until a user signs in with a PIN. -->
   <section class="login" id="login-view" aria-label="Sign in">
     <div class="login__card">
@@ -99,11 +163,11 @@
         <div class="cart__summary">
           <div class="cart__summary-row">
             <span>Subtotal</span>
-            <span id="cart-subtotal">GH₵0.00</span>
+            <span id="cart-subtotal">0.00</span>
           </div>
           <div class="cart__summary-row cart__summary-row--total">
             <span>Total</span>
-            <span id="cart-total">GH₵0.00</span>
+            <span id="cart-total">0.00</span>
           </div>
           <!-- Enabled when the cart has items (managed in app.js renderCart). -->
           <button class="btn btn--primary cart__checkout" id="checkout-button" type="button" disabled>
@@ -127,6 +191,7 @@
           <label class="reports__print-format" id="inventory-print-format" hidden><span>Print size</span><select class="field__input" id="inventory-print-size"><option value="80mm">80 mm thermal (default)</option><option value="58mm">58 mm thermal</option><option value="a4">A4 paper</option></select></label>
           <button class="btn btn--primary" id="inventory-print" type="button" hidden>Print inventory report</button>
           <button class="btn btn--secondary" id="inventory-export-pdf" type="button" hidden>Export PDF</button>
+          <button class="btn btn--secondary" id="manage-categories" type="button" hidden>Manage categories</button>
           <button class="btn btn--primary" id="manage-add" type="button">Add product</button>
           <button class="btn btn--secondary" id="manage-close" type="button">Close</button>
         </div>
@@ -259,10 +324,10 @@
         </div>
         <p class="modal__error reports__error" id="reports-error" role="alert"></p>
         <div class="reports__metrics" aria-label="Sales totals">
-          <article class="report-card"><span class="report-card__label">Total sales revenue</span><strong class="report-card__value" id="reports-revenue">GH₵0.00</strong></article>
+          <article class="report-card"><span class="report-card__label">Total sales revenue</span><strong class="report-card__value" id="reports-revenue">0.00</strong></article>
           <article class="report-card"><span class="report-card__label">Completed transactions</span><strong class="report-card__value" id="reports-count">0</strong></article>
-          <article class="report-card"><span class="report-card__label">Cash sales</span><strong class="report-card__value" id="reports-cash">GH₵0.00</strong></article>
-          <article class="report-card"><span class="report-card__label">MoMo sales</span><strong class="report-card__value" id="reports-momo">GH₵0.00</strong></article>
+          <article class="report-card"><span class="report-card__label">Cash sales</span><strong class="report-card__value" id="reports-cash">0.00</strong></article>
+          <article class="report-card"><span class="report-card__label">MoMo sales</span><strong class="report-card__value" id="reports-momo">0.00</strong></article>
         </div>
         <div class="reports__details">
           <section class="report-panel" aria-labelledby="best-seller-title"><h3 class="report-panel__title" id="best-seller-title">Best-selling item</h3><p class="report-panel__empty" id="reports-best-seller">No items sold.</p></section>
@@ -288,7 +353,7 @@
       <p class="modal__error" id="sales-history-error" role="alert"></p>
       <div class="sales-history__summary" aria-live="polite">
         <article class="report-card"><span class="report-card__label">Completed transactions</span><strong class="report-card__value" id="sales-history-count">0</strong></article>
-        <article class="report-card"><span class="report-card__label">Filtered sales total</span><strong class="report-card__value" id="sales-history-total">GH₵0.00</strong></article>
+        <article class="report-card"><span class="report-card__label">Filtered sales total</span><strong class="report-card__value" id="sales-history-total">0.00</strong></article>
       </div>
       <div class="sales-history__table-wrap">
         <table class="sales-history__table"><thead><tr><th>Receipt</th><th>Date &amp; time</th><th>Cashier</th><th>Payment</th><th>Items</th><th>Total</th><th><span class="visually-hidden">Action</span></th></tr></thead><tbody id="sales-history-body"></tbody></table>
@@ -357,9 +422,10 @@
       </div>
 
       <footer class="modal__footer">
+        <p class="modal__hint" id="modal-size-hint">Pick a size above to set the price.</p>
         <div class="modal__total">
           <span>Unit total</span>
-          <span id="modal-total">GH₵0.00</span>
+          <span id="modal-total">0.00</span>
         </div>
         <p class="modal__error" id="modal-error" role="alert"></p>
         <div class="modal__actions">
@@ -400,14 +466,16 @@
         </label>
 
         <p class="field__note" id="pf-meal-note" hidden>
-          A configured meal is priced by its packages (sizes) below and is never
-          inventory-tracked. A simple product is just a name and one price.
+          Set this meal up in 2 steps: <strong>1)</strong> add its packages (sizes)
+          below, <strong>2)</strong> tick any extras. The price comes from the
+          packages, so a meal needs at least one before it can be sold. (A simple
+          product is just a name and one price instead.)
         </p>
 
         <!-- Packages (portions): only for configured meals -->
         <div class="field pf-meal-only" id="pf-packages-section" hidden>
           <span class="field__label">Packages / sizes</span>
-          <p class="field__note">Each package is a size or option with its own price and what it includes.</p>
+          <p class="field__note">One row per size. Give each a name, a price, and what's included — e.g. name "Regular", included "3 scoops + 1 protein". Use "+ Add package" for another size.</p>
           <div class="pkg-list" id="pf-packages-list"></div>
           <button class="btn btn--secondary pkg-add" id="pf-add-package" type="button">+ Add package</button>
         </div>
@@ -418,12 +486,12 @@
             <span class="field__label">Allowed extras</span>
             <button class="btn btn--secondary pf-extras-manage" id="pf-manage-extras" type="button">Manage extras…</button>
           </div>
-          <p class="field__note">Tick the paid extras a customer can add to this meal.</p>
+          <p class="field__note">Optional. Tick the add-ons a customer can add to this meal. Don't see one? Click "Manage extras…" to create or edit the shared list (name, price, max per order).</p>
           <div class="extras-check-list" id="pf-extras-list"></div>
         </div>
 
         <label class="field" id="pf-price-field">
-          <span class="field__label">Selling price (GH₵)</span>
+          <span class="field__label" id="pf-price-label">Selling price</span>
           <input class="field__input" id="pf-price" type="number" min="0" step="0.01"
                  inputmode="decimal" />
         </label>
@@ -500,6 +568,30 @@
     </div>
   </div>
 
+  <!-- Categories: create / edit / delete the product categories (Admin). -->
+  <div class="modal" id="category-modal" hidden role="dialog" aria-modal="true"
+       aria-labelledby="category-modal-title">
+    <div class="modal__overlay" id="category-overlay"></div>
+    <div class="modal__panel" role="document">
+      <header class="modal__header">
+        <h2 class="modal__title" id="category-modal-title">Categories</h2>
+        <button class="modal__close" id="category-close" type="button" aria-label="Close">&#10005;</button>
+      </header>
+      <div class="modal__body">
+        <p class="field__note">Categories group products on the sales screen. Products in a deleted category simply show under "All".</p>
+        <div class="cat-editor" id="category-editor-list"></div>
+        <button class="btn btn--secondary" id="category-add" type="button">+ Add category</button>
+        <p class="modal__error" id="category-error" role="alert"></p>
+      </div>
+      <footer class="modal__footer">
+        <div class="modal__actions">
+          <button class="btn btn--secondary" id="category-cancel" type="button">Cancel</button>
+          <button class="btn btn--primary" id="category-save" type="button">Save categories</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
   <!-- Checkout modal (Cash / MoMo). Filled and controlled by app.js. -->
   <div class="modal" id="checkout-modal" hidden role="dialog" aria-modal="true"
        aria-labelledby="checkout-title">
@@ -513,7 +605,7 @@
       <div class="modal__body">
         <div class="checkout__row checkout__row--total">
           <span>Total</span>
-          <span id="checkout-total">GH₵0.00</span>
+          <span id="checkout-total">0.00</span>
         </div>
 
         <div class="field">
@@ -529,13 +621,13 @@
         <!-- Cash: amount received + live change -->
         <div id="cash-fields">
           <label class="field">
-            <span class="field__label">Amount received (GH₵)</span>
+            <span class="field__label" id="checkout-amount-label">Amount received</span>
             <input class="field__input" id="checkout-amount" type="number" min="0"
                    step="0.01" inputmode="decimal" />
           </label>
           <div class="checkout__row checkout__change">
             <span>Change</span>
-            <span id="checkout-change">GH₵0.00</span>
+            <span id="checkout-change">0.00</span>
           </div>
         </div>
 
