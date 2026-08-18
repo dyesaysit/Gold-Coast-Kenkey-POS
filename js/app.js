@@ -2947,21 +2947,33 @@
     elements.backupError.textContent = "";
   }
 
-  function exportPosBackup() {
-    if (!isAdmin()) { showToast("Admin access is required."); return; }
-    var result = backupService.exportBackup(currentUser.role);
-    if (!result.ok) { elements.backupError.textContent = result.message; return; }
-    var blob = new Blob([result.json], { type: "application/json" });
+  function downloadBackupJson(json, filename) {
+    var blob = new Blob([json], { type: "application/json" });
     var url = URL.createObjectURL(blob);
     var link = document.createElement("a");
     link.href = url;
-    link.download = result.filename;
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
     elements.backupError.textContent = "";
     showToast("Backup exported.");
+  }
+
+  function exportPosBackup() {
+    if (!isAdmin()) { showToast("Admin access is required."); return; }
+    // Server mode: export the authoritative backup straight from the database.
+    if (global.GCK.data && global.GCK.data.isServerMode()) {
+      global.GCK.data.fetchServerBackup().then(function (result) {
+        if (!result.ok) { elements.backupError.textContent = result.message; return; }
+        downloadBackupJson(result.json, result.filename);
+      });
+      return;
+    }
+    var result = backupService.exportBackup(currentUser.role);
+    if (!result.ok) { elements.backupError.textContent = result.message; return; }
+    downloadBackupJson(result.json, result.filename);
   }
 
   function selectBackupFile(file) {
@@ -3001,6 +3013,23 @@
     var confirmed = global.confirm("Restore this backup? Current POS data will be replaced and you will be signed out.");
     if (!confirmed) { return; }
     elements.backupRestore.disabled = true;
+
+    // Server mode: replace the shared database, then reload (which re-hydrates
+    // the local cache from the server).
+    if (global.GCK.data && global.GCK.data.isServerMode()) {
+      global.GCK.data.restoreOnServer(selectedBackup).then(function (result) {
+        if (!result.ok) {
+          elements.backupRestore.disabled = false;
+          elements.backupError.textContent = result.message;
+          return;
+        }
+        storage.clearSession();
+        showToast("Backup restored. Reloading POS...");
+        global.setTimeout(function () { global.location.reload(); }, 400);
+      });
+      return;
+    }
+
     var result = backupService.restoreBackup(currentUser.role, selectedBackup, true);
     if (!result.ok) {
       elements.backupRestore.disabled = false;
@@ -3414,24 +3443,33 @@
       status: "completed"
     };
 
-    // Stock is only reduced here, inside a completed sale.
-    var completion = storage.completeSale(sale);
-    if (!completion.success) {
-      isCompleting = false;
-      elements.checkoutComplete.disabled = false;
-      setCheckoutError(completion.message || "Could not save the sale safely. Please try again.");
-      return;
-    }
+    // Stock is only reduced here, inside a completed sale. The gateway runs the
+    // local transaction in local mode, or the atomic /api/sales call in server
+    // mode (where the server assigns the receipt number). Same handling either
+    // way; the returned sale is authoritative for the receipt.
+    completeSaleVia(sale);
+  }
 
-    // Refresh from storage: cart cleared, inventory stock reduced.
-    state.cart = storage.getCurrentCart();
-    state.inventoryProducts = storage.getInventoryProducts();
-    renderProducts();
-    renderCart();
+  function completeSaleVia(sale) {
+    global.GCK.data.completeSale(sale).then(function (completion) {
+      if (!completion.success) {
+        isCompleting = false;
+        elements.checkoutComplete.disabled = false;
+        setCheckoutError(completion.message || "Could not save the sale safely. Please try again.");
+        return;
+      }
+      var finalSale = completion.sale || sale;
 
-    closeCheckout();
-    showReceipt(sale);
-    showToast("Sale completed. Receipt " + sale.receiptNumber + ".");
+      // Refresh from storage: cart cleared, inventory stock reduced.
+      state.cart = storage.getCurrentCart();
+      state.inventoryProducts = storage.getInventoryProducts();
+      renderProducts();
+      renderCart();
+
+      closeCheckout();
+      showReceipt(finalSale);
+      showToast("Sale completed. Receipt " + finalSale.receiptNumber + ".");
+    });
   }
 
   // --- Receipt -------------------------------------------------------------
@@ -3712,6 +3750,14 @@
       document.addEventListener(evt, resetIdleTimer, { passive: true });
     });
 
+    // Server mode only: when this device regains focus, quietly pull the latest
+    // shared data into the local cache so history, reports and the next screen
+    // reflect sales/stock changes made on other devices. Read screens re-read
+    // the cache when opened, so no disruptive live re-render is needed here.
+    if (global.GCK.data && global.GCK.data.isServerMode()) {
+      global.addEventListener("focus", function () { global.GCK.data.refresh(); });
+    }
+
     // First launch (no settings/users yet): run the setup wizard instead of
     // seeding a fixed menu, so any business can start with its own details.
     if (needsSetup()) {
@@ -3737,7 +3783,16 @@
     }
   }
 
-  document.addEventListener("DOMContentLoaded", init);
+  // Decide local vs server mode and prime the cache before the app renders.
+  // bootstrap() always resolves, and falls back to local mode if anything goes
+  // wrong, so the standalone app still starts even without the Phase 2 server.
+  document.addEventListener("DOMContentLoaded", function () {
+    if (global.GCK.data && global.GCK.data.bootstrap) {
+      global.GCK.data.bootstrap().then(init, init);
+    } else {
+      init();
+    }
+  });
 
   // Exposed for manual testing in the browser console.
   global.GCK.app = { state: state };

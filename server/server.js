@@ -223,6 +223,14 @@ var server = http.createServer(function (req, res) {
     sendJson(res, 405, { error: "Method not allowed" });
     return;
   }
+  // The app ships no favicon; answer the browser's automatic request quietly
+  // instead of logging a 404.
+  if (urlPath === "/favicon.ico") {
+    applyBaseHeaders(res);
+    res.writeHead(204);
+    res.end();
+    return;
+  }
   serveStatic(req, res, urlPath);
 });
 
