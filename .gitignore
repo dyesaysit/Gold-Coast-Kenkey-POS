@@ -1,0 +1,10 @@
+# Runtime database files (created by the Phase 2 server on first run).
+server/data/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db

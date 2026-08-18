@@ -72,9 +72,41 @@ Once other devices connect over the network, the deploy-time items in
 Node server, and — critically — **hashing PINs server-side** instead of storing
 them in plaintext). These are out of scope for Phase 1.
 
+### Mobile UX: full slide-up cart drawer
+Today the phone cart stacks below the product grid, and a sticky bottom bar
+("Review order") scrolls it into view before payment — a solid, standard
+pattern that removes the long scroll to checkout. The best-in-class refinement,
+deferred to Phase 2 because it is a structural change (more state, more testing)
+rather than a fix:
+
+- Stop stacking the cart under the menu. Give the product grid the **entire**
+  screen on phones.
+- Turn the bottom bar into the handle for a **slide-up sheet (drawer)**: tapping
+  it slides the cart up over the menu for review + edit + pay, then dismisses.
+- This is the Square/Loyverse mobile model and keeps the menu maximally visible
+  while the cart stays one tap away.
+
+Purely a front-end change (CSS + `app.js`); it does not depend on the
+Node/SQLite work above and could ship independently after grading.
+
 ## Summary
 
 | Milestone | Storage | Devices | Needed for grade? |
 |-----------|---------|---------|-------------------|
 | Phase 1 — Electron install | `localStorage` | Single till PC | **Yes** |
 | Phase 2 — Node + SQLite API | Shared SQLite DB | Till + phones on Wi-Fi | No (future work) |
+
+## Implementation status
+
+Phase 2 (Node + SQLite server, shared multi-device data, DB-backed
+backup/restore) is **implemented** — see `server/` and
+`js/services/server-sync.js`, run with `npm start`. It is layered behind
+server-mode detection, so the Phase 1 standalone app is unchanged and still runs
+with no server.
+
+Still open as future refinements:
+- **Live push** so already-open screens on other devices update without a reload
+  or window refocus (today a device pulls fresh data on load and on focus).
+- **Server-side PIN hashing** once authentication moves to the server
+  (`docs/SECURITY.md`).
+- The **full slide-up cart drawer** (mobile UX item above).
