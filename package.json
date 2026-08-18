@@ -1,0 +1,13 @@
+{
+  "name": "gold-coast-kenkey-pos",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Gold Coast Kenkey POS. The app runs client-side from index.html; the optional Phase 2 server (server/) adds a shared SQLite database for multi-device use.",
+  "scripts": {
+    "start": "node --experimental-sqlite server/server.js",
+    "test": "node --experimental-sqlite tests/server-db.test.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}
