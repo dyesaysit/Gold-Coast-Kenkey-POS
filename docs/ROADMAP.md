@@ -95,3 +95,18 @@ Node/SQLite work above and could ship independently after grading.
 |-----------|---------|---------|-------------------|
 | Phase 1 — Electron install | `localStorage` | Single till PC | **Yes** |
 | Phase 2 — Node + SQLite API | Shared SQLite DB | Till + phones on Wi-Fi | No (future work) |
+
+## Implementation status
+
+Phase 2 (Node + SQLite server, shared multi-device data, DB-backed
+backup/restore) is **implemented** — see `server/` and
+`js/services/server-sync.js`, run with `npm start`. It is layered behind
+server-mode detection, so the Phase 1 standalone app is unchanged and still runs
+with no server.
+
+Still open as future refinements:
+- **Live push** so already-open screens on other devices update without a reload
+  or window refocus (today a device pulls fresh data on load and on focus).
+- **Server-side PIN hashing** once authentication moves to the server
+  (`docs/SECURITY.md`).
+- The **full slide-up cart drawer** (mobile UX item above).

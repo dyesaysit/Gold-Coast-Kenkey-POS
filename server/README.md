@@ -61,9 +61,24 @@ client app.
 | GET | `/api/backup` | Download a `gckpos-backup` file |
 | POST | `/api/restore` | Replace all data from a `gckpos-backup` file |
 
+## How the client uses it
+
+`js/services/server-sync.js` decides the mode once at startup by calling
+`/api/health`:
+
+- **No server** (app opened as a file, or served by a plain static server):
+  the app stays in Phase 1 localStorage mode, completely unchanged.
+- **Served by this server:** the app hydrates its local cache from
+  `/api/bootstrap`, mirrors catalogue/settings edits to the server, routes
+  checkout through `/api/sales`, and uses `/api/backup` and `/api/restore` for
+  the admin backup screen. `localStorage` stays as the local read cache, so the
+  rest of the app is unchanged.
+
+A device pulls the latest shared data on load and whenever its window regains
+focus. (Live push to already-open screens on other devices is a later
+refinement — see the slide-up/real-time notes in `docs/ROADMAP.md`.)
+
 ## Status
 
-This is the **server + database foundation**. The browser client still runs in
-its normal localStorage mode and is unchanged. Wiring the client to talk to this
-API (so phones actually share the till's data) is the next Phase 2 step, and will
-be added behind server-mode detection so the standalone app keeps working.
+Phase 2 is functional: the server, the database, and the client wiring are all
+in place and tested. The standalone Phase 1 app still works with no server.
