@@ -23,12 +23,21 @@ npm start
 On start it prints two addresses:
 
 ```
-On this computer:   http://localhost:3000
-On phones (Wi-Fi):  http://192.168.x.x:3000
+On this computer:   http://localhost:4000
+On phones (Wi-Fi):  http://192.168.x.x:4000
 ```
 
 - Open the **localhost** address on the till PC.
 - Open the **Wi-Fi** address on any phone connected to the same network.
+
+The default port is **4000**. If it is already in use, the server automatically
+tries 4001, 4002, and so on, and prints the address it actually used. To force a
+specific port: `$env:PORT=5050; npm start` (PowerShell).
+
+> **Important:** phones only share the till's data when they open the address
+> printed by **`npm start`** (this Node server). Opening the app through a plain
+> static file server (or as a local file) runs it in standalone localStorage
+> mode, where each device keeps its own separate data.
 
 The database file is created at `server/data/gckpos.db` (git-ignored). On the
 very first run the database is seeded with the same sample data as the

@@ -19,7 +19,10 @@ var seedLoader = require("./seed-loader.js");
 var PROJECT_ROOT = path.join(__dirname, "..");
 var DATA_DIR = path.join(__dirname, "data");
 var DB_FILE = path.join(DATA_DIR, "gckpos.db");
-var PORT = Number(process.env.PORT) || 3000;
+// Default 4000, not 3000, since 3000 is a common port for other dev servers.
+// If the chosen port is busy the server hunts upward for a free one (below).
+var PORT = Number(process.env.PORT) || 4000;
+var MAX_PORT_TRIES = 15;
 
 // --- database bootstrap --------------------------------------------------
 if (!fs.existsSync(DATA_DIR)) { fs.mkdirSync(DATA_DIR, { recursive: true }); }
@@ -234,7 +237,7 @@ var server = http.createServer(function (req, res) {
   serveStatic(req, res, urlPath);
 });
 
-server.listen(PORT, "0.0.0.0", function () {
+function announce(port) {
   var nets = require("node:os").networkInterfaces();
   var lan = null;
   Object.keys(nets).forEach(function (iface) {
@@ -243,7 +246,37 @@ server.listen(PORT, "0.0.0.0", function () {
     });
   });
   console.log("Gold Coast Kenkey POS server running.");
-  console.log("  On this computer:   http://localhost:" + PORT);
-  if (lan) { console.log("  On phones (Wi-Fi):  http://" + lan + ":" + PORT); }
+  console.log("  On this computer:   http://localhost:" + port);
+  if (lan) { console.log("  On phones (Wi-Fi):  http://" + lan + ":" + port); }
   console.log("  Database file:      " + DB_FILE);
-});
+}
+
+// Start on PORT; if it is already taken (e.g. another dev server), quietly try
+// the next port up instead of crashing, so it never clashes with other apps.
+// Each attempt attaches exactly one 'error' and one 'listening' handler and
+// removes its counterpart, so a failed bind never leaves a stale callback that
+// would announce the wrong port.
+function startServer(port, triesLeft) {
+  function onError(err) {
+    server.removeListener("listening", onListening);
+    if (err.code === "EADDRINUSE" && triesLeft > 0) {
+      console.log("Port " + port + " is in use, trying " + (port + 1) + "...");
+      startServer(port + 1, triesLeft - 1);
+    } else if (err.code === "EADDRINUSE") {
+      console.error("Could not find a free port near " + PORT + ".");
+      console.error("Pick one yourself, e.g.  $env:PORT=5050; npm start");
+      process.exit(1);
+    } else {
+      throw err;
+    }
+  }
+  function onListening() {
+    server.removeListener("error", onError);
+    announce(port);
+  }
+  server.once("error", onError);
+  server.once("listening", onListening);
+  server.listen(port, "0.0.0.0");
+}
+
+startServer(PORT, MAX_PORT_TRIES);
