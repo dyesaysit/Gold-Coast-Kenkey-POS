@@ -15,8 +15,23 @@
  */
 "use strict";
 
-var sqlite = require("node:sqlite");
-var DatabaseSync = sqlite.DatabaseSync;
+// node:sqlite is built into Node 22.5+ (run with --experimental-sqlite). Fail
+// with a clear, actionable message rather than a cryptic module error if this
+// runtime does not have it — this is the capability the Electron installer must
+// provide (Electron 35+ bundles Node 22; otherwise spawn the system Node).
+var DatabaseSync;
+try {
+  DatabaseSync = require("node:sqlite").DatabaseSync;
+} catch (error) {
+  throw new Error(
+    "node:sqlite is unavailable in this Node runtime. Node 22.5+ is required " +
+    "(start with --experimental-sqlite). For the packaged app use Electron 35+ " +
+    "(bundles Node 22) or spawn the system Node. Underlying error: " + error.message
+  );
+}
+if (typeof DatabaseSync !== "function") {
+  throw new Error("node:sqlite loaded but DatabaseSync is missing; upgrade to Node 22.5+.");
+}
 
 // storage key <-> table, matching storage-service.js KEYS exactly.
 var COLLECTIONS = [

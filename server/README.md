@@ -87,7 +87,31 @@ A device pulls the latest shared data on load and whenever its window regains
 focus. (Live push to already-open screens on other devices is a later
 refinement — see the slide-up/real-time notes in `docs/ROADMAP.md`.)
 
+## Packaging prerequisites (for the Electron installer)
+
+Two things the installer must handle, now prepared in the code:
+
+1. **Writable database location.** The install folder is read-only once
+   installed, so the database must live elsewhere. `server.js` reads the data
+   directory from the `GCKPOS_DATA_DIR` environment variable and only falls back
+   to `server/data` for development. The Electron host should set:
+   `GCKPOS_DATA_DIR = app.getPath("userData")`.
+
+2. **`node:sqlite` availability.** The server needs Node 22.5+ with the built-in
+   `node:sqlite` module. `db.js` now fails with a clear message if it is missing.
+   Options for Electron:
+   - **Run the server in Electron's main process** — requires **Electron 35+**,
+     which bundles Node 22 (has `node:sqlite`). Simplest if the Electron version
+     is new enough.
+   - **Spawn the server as a child process** using a bundled/known Node 22+
+     binary. Works regardless of Electron's own Node version.
+
+   A one-off spike (run `server/server.js` inside the chosen Electron version)
+   should confirm `node:sqlite` loads before committing to that Electron version.
+
 ## Status
 
 Phase 2 is functional: the server, the database, and the client wiring are all
 in place and tested. The standalone Phase 1 app still works with no server.
+Installer prerequisites #1 (writable data dir) and #2 (node:sqlite guard) above
+are prepared; the live Electron spike remains before packaging.

@@ -17,7 +17,11 @@ var db = require("./db.js");
 var seedLoader = require("./seed-loader.js");
 
 var PROJECT_ROOT = path.join(__dirname, "..");
-var DATA_DIR = path.join(__dirname, "data");
+// The database must live in a WRITABLE location. When packaged (e.g. Electron),
+// the install folder is read-only, so the host sets GCKPOS_DATA_DIR to a per-user
+// data path (Electron: app.getPath("userData")). Falls back to server/data for
+// plain `npm start` during development.
+var DATA_DIR = process.env.GCKPOS_DATA_DIR || path.join(__dirname, "data");
 var DB_FILE = path.join(DATA_DIR, "gckpos.db");
 // Default 4000, not 3000, since 3000 is a common port for other dev servers.
 // If the chosen port is busy the server hunts upward for a free one (below).
