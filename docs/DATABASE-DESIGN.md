@@ -481,23 +481,58 @@ If a step fails, do not silently leave partially updated data.
 
 For LocalStorage, prepare all updated objects before writing them.
 
-## 19. Future Relational Database Mapping
+## 19. Relational Database Mapping (Phase 2 — implemented)
 
-The same model can later map to tables:
+The optional Phase 2 server (`server/`) maps this model to a **normalized SQLite
+schema** with real foreign keys, so the database has genuine relationships (see
+`server/db.js`). The client, the REST API, and the JSON backup all keep the same
+object shapes — the server decomposes them into rows on write and reassembles the
+exact same objects on read.
+
+### Tables and relationships
 
 ```text
-categories
-menu_items
-portions
-protein_options
-extras
-menu_item_extras
-inventory_products
-sales
-sale_items
-sale_item_extras
-cashiers
-settings
+categories(id PK, name, display_order, active)
+cashiers(id PK, name, pin, role, active)
+proteins(id PK, name, additional_price, active)
+extras(id PK, name, price, maximum_quantity, active)
+
+menu_items(id PK, name, category_id -> categories, item_type, image, description,
+           active, popular, product_type, track_inventory,
+           stock_quantity, low_stock_level)
+portions(id PK, menu_item_id -> menu_items, name, price, included_description,
+         protein_required, active)
+inventory_products(id PK, name, category_id -> categories, item_type, image,
+                   selling_price, stock_quantity, low_stock_level, active,
+                   popular, product_type, track_inventory)
+
+menu_item_extras(menu_item_id -> menu_items, extra_id -> extras)     -- M:N
+portion_proteins(portion_id -> portions, protein_id -> proteins)     -- M:N
+
+sales(id PK, receipt_number, created_at, cashier_id -> cashiers, cashier_name,
+      subtotal, discount, total, payment_method, payment_amount_paid,
+      payment_change, payment_reference, status, receipt_settings)
+sale_items(seq PK, sale_id -> sales, product_id, product_name, item_type,
+           quantity, unit_price, line_total, track_inventory, details)
+
+settings(key PK, value)   -- singleton config as key/value
 ```
 
-This future mapping is not required for the first version.
+Relationships: `categories 1—* menu_items 1—* portions`,
+`categories 1—* inventory_products`, `menu_items *—* extras`,
+`portions *—* proteins`, `cashiers 1—* sales 1—* sale_items`.
+
+### Deliberate design notes
+- **Foreign keys are declared** (so the schema/ER diagram expresses the
+  relationships) but **not runtime-enforced**: the client saves whole
+  collections at once (replace-all), which a strict engine would reject
+  mid-transaction. Integrity is managed by the client, as in Phase 1.
+- **`sale_items.details`** keeps each line's immutable snapshot (chosen portion,
+  protein, extras) verbatim beside its financial columns — a receipt must never
+  change when the catalogue later changes.
+- **`settings`** is singleton config with no relationships, so it is a key/value
+  table rather than a wide column table.
+- **Stock** is decremented on checkout with a real transactional SQL `UPDATE`
+  (see section 18); the server also assigns receipt numbers atomically.
+- An **upgrade guard** rebuilds any database left over from the earlier
+  document-store layout; data is recovered by restoring a JSON backup.
