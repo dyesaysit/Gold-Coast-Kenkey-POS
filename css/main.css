@@ -1080,6 +1080,17 @@ button.modal__close:hover {
   gap: var(--space-sm);
 }
 
+/* Grid items default to min-width:auto, which lets an input's intrinsic width
+   push the column past the card. min-width:0 lets the two columns share the
+   width evenly; width:100% keeps each input inside its column. */
+.setup-form__row .field {
+  min-width: 0;
+}
+
+.setup-form .field__input {
+  width: 100%;
+}
+
 .setup-logo-preview { height: 96px; }
 
 .btn--block { width: 100%; }
