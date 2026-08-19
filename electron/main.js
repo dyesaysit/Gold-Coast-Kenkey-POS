@@ -21,6 +21,7 @@ var http = require("node:http");
 var net = require("node:net");
 var fs = require("node:fs");
 var os = require("node:os");
+var qrcode = require("qrcode");
 
 var APP_ROOT = path.join(__dirname, "..");
 var SERVER_ENTRY = path.join(APP_ROOT, "server", "server.js");
@@ -127,12 +128,40 @@ function showPhoneAddress() {
     return;
   }
   var lan = lanAddress();
-  dialog.showMessageBox(win, {
-    type: "info", title: "Phone access",
-    message: lan
-      ? "On a phone connected to the SAME Wi-Fi, open this address in its browser:\n\n    http://" + lan + ":" + serverPort + "\n\nThe cashier signs in with their PIN."
-      : "Could not detect a Wi-Fi address. Make sure the till PC is connected to Wi-Fi."
+  if (!lan) {
+    dialog.showMessageBox(win, {
+      type: "info", title: "Phone access",
+      message: "Could not detect a Wi-Fi address. Make sure the till PC is connected to Wi-Fi."
+    });
+    return;
+  }
+  var url = "http://" + lan + ":" + serverPort;
+  qrcode.toString(url, { type: "svg", margin: 1 }, function (err, svg) {
+    openPhoneWindow(url, err ? "" : svg);
   });
+}
+
+// A small window showing the phone address big, with a scannable QR code.
+function openPhoneWindow(url, svg) {
+  var qrWin = new BrowserWindow({
+    width: 420, height: 560, parent: win, modal: true, resizable: false,
+    title: "Phone access", autoHideMenuBar: true,
+    webPreferences: { contextIsolation: true, nodeIntegration: false }
+  });
+  var qrBlock = svg ? "<div class='qr'>" + svg + "</div>" : "<p>(QR code unavailable)</p>";
+  var html = "<!doctype html><html><head><meta charset='utf-8'><style>" +
+    "body{font-family:system-ui,'Segoe UI',Arial,sans-serif;text-align:center;padding:24px;color:#14532d;background:#fff;margin:0}" +
+    "h1{font-size:20px;margin:0 0 4px}p{color:#444;margin:6px 0}" +
+    ".qr{width:300px;height:300px;margin:12px auto}.qr svg{width:100%;height:100%}" +
+    ".url{font-size:17px;font-weight:bold;color:#14532d;word-break:break-all;margin:10px 0}" +
+    ".hint{font-size:13px;color:#666}" +
+    "</style></head><body>" +
+    "<h1>Open on a phone</h1><p>Connect the phone to the same Wi-Fi.</p>" +
+    qrBlock +
+    "<div class='url'>" + url + "</div>" +
+    "<p class='hint'>Scan the code, or type the address into the phone's browser, then sign in with a PIN.</p>" +
+    "</body></html>";
+  qrWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(html));
 }
 
 function buildMenu() {

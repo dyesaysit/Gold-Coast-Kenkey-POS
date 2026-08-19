@@ -55,9 +55,11 @@ By default the app is **local only** — nothing is exposed to the network.
 
 1. In the app menu: **Phones → Allow phones on Wi-Fi** (tick it). The server
    restarts in LAN mode and shows the phone address.
-2. **Phones → Show phone address…** displays e.g. `http://192.168.0.101:<port>`.
-3. On a phone connected to the **same Wi-Fi**, open that address in its browser
-   and sign in with a PIN. Sales sync to the shared database.
+2. **Phones → Show phone address…** opens a window with a **scannable QR code**
+   and the address (e.g. `http://192.168.0.101:<port>`).
+3. On a phone connected to the **same Wi-Fi**, **scan the QR** (or type the
+   address) in its browser and sign in with a PIN. Sales sync to the shared
+   database.
 
 Notes:
 - **Windows Firewall** will likely prompt the first time — click **Allow** on

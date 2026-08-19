@@ -43,5 +43,8 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Chop Chop POS"
     }
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
   }
 }
