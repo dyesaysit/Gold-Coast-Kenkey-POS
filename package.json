@@ -19,8 +19,8 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
-    "appId": "com.goldcoastkenkey.pos",
-    "productName": "Gold Coast Kenkey POS",
+    "appId": "com.chopchop.pos",
+    "productName": "Chop Chop POS",
     "asar": false,
     "files": [
       "electron/**",
@@ -41,7 +41,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Gold Coast Kenkey POS"
+      "shortcutName": "Chop Chop POS"
     }
   }
 }

@@ -99,7 +99,7 @@ function createWindow() {
     width: 1280,
     height: 800,
     show: false,
-    title: "Gold Coast Kenkey POS",
+    title: "Chop Chop POS",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

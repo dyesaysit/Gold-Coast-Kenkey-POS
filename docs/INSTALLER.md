@@ -36,13 +36,13 @@ npm run dist
 ```
 
 electron-builder produces the installer under `dist/` (e.g.
-`dist/Gold Coast Kenkey POS Setup 2.0.0.exe`). Run it to install; it creates the
+`dist/Chop Chop POS Setup 2.0.0.exe`). Run it to install; it creates the
 desktop shortcut. Uninstall via Windows "Apps & features".
 
 ## How it works when installed
 
 - The app stores its database in the per-user data folder
-  (`%APPDATA%/Gold Coast Kenkey POS/gckpos.db`), which is writable — the install
+  (`%APPDATA%/Chop Chop POS/gckpos.db`), which is writable — the install
   folder itself is read-only.
 - On launch it picks a free port, starts `server/server.js` as a child process
   (Electron's own Node, `--experimental-sqlite`), waits for `/api/health`, then
