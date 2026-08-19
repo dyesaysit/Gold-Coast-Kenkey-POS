@@ -569,7 +569,9 @@ function open(filePath) {
       });
       return { ok: true };
     } catch (error) {
-      return { ok: false, code: "write-failed", message: "Restore could not be saved: " + error.message };
+      // Log the detail server-side; return a generic message (no internals).
+      console.error("Restore failed:", error);
+      return { ok: false, code: "write-failed", message: "Restore could not be saved." };
     }
   }
 

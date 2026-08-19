@@ -20,24 +20,47 @@ npm start
 
 (That is just `node --experimental-sqlite server/server.js`.)
 
-On start it prints two addresses:
+By default the server is **local only** (bound to `localhost`) so nothing is
+exposed to the network — right for a single-machine till. It prints:
 
 ```
 On this computer:   http://localhost:4000
-On phones (Wi-Fi):  http://192.168.x.x:4000
+(Local only. For phones on the same Wi-Fi: $env:GCKPOS_HOST='0.0.0.0'; npm start)
 ```
 
-- Open the **localhost** address on the till PC.
-- Open the **Wi-Fi** address on any phone connected to the same network.
+### Letting phones connect (opt-in)
+
+To share the till's data with phones on the same Wi-Fi, start it in LAN mode:
+
+```bash
+$env:GCKPOS_HOST='0.0.0.0'; npm start   # PowerShell
+```
+
+Now it also prints a `http://192.168.x.x:4000` address to open on the phones.
+Because the API does not have a login yet (see Security below), **only enable
+LAN mode on a trusted private Wi-Fi.**
 
 The default port is **4000**. If it is already in use, the server automatically
 tries 4001, 4002, and so on, and prints the address it actually used. To force a
 specific port: `$env:PORT=5050; npm start` (PowerShell).
 
 > **Important:** phones only share the till's data when they open the address
-> printed by **`npm start`** (this Node server). Opening the app through a plain
-> static file server (or as a local file) runs it in standalone localStorage
-> mode, where each device keeps its own separate data.
+> printed by **`npm start`** in LAN mode (this Node server). Opening the app
+> through a plain static file server (or as a local file) runs it in standalone
+> localStorage mode, where each device keeps its own separate data.
+
+## Security
+
+- The server binds to **localhost only by default**; network access is an
+  explicit opt-in (`GCKPOS_HOST=0.0.0.0`).
+- SQL uses parameterized queries; static serving is limited to the browser files
+  and guards against path traversal; request bodies are size-capped; and the
+  `X-Frame-Options` / `nosniff` / `Referrer-Policy` headers are set.
+- **Known gap (before production):** the REST API has **no authentication**, and
+  PINs are stored/served in plaintext. On a trusted private Wi-Fi this is
+  acceptable for the project; a real multi-device deployment needs a server-side
+  login (PIN → token) and hashed PINs. Tracked in `docs/ROADMAP.md` /
+  `docs/SECURITY.md`.
 
 The database file is created at `server/data/gckpos.db` (git-ignored). On the
 very first run the database is seeded with the same sample data as the
