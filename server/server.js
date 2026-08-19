@@ -36,8 +36,15 @@ var LAN_ENABLED = HOST === "0.0.0.0" || HOST === "::";
 // --- database bootstrap --------------------------------------------------
 if (!fs.existsSync(DATA_DIR)) { fs.mkdirSync(DATA_DIR, { recursive: true }); }
 var store = db.open(DB_FILE);
-var seeded = store.seedIfEmpty(seedLoader.loadSeedData(PROJECT_ROOT));
-if (seeded) { console.log("Seeded a fresh database with sample data."); }
+// A fresh install starts EMPTY so the app's first-run setup wizard runs — the
+// owner sets their OWN business name, admin PIN, currency and logo, and starts
+// with a few editable sample products. No demo accounts (no default PINs).
+// Set GCKPOS_SEED_DEMO=1 to preload the full demo catalogue for testing instead.
+if (process.env.GCKPOS_SEED_DEMO) {
+  if (store.seedIfEmpty(seedLoader.loadSeedData(PROJECT_ROOT))) {
+    console.log("Seeded the demo catalogue (GCKPOS_SEED_DEMO).");
+  }
+}
 
 // --- static file serving -------------------------------------------------
 var CONTENT_TYPES = {

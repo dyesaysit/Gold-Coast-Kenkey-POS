@@ -76,6 +76,25 @@
       if (ok) { pushSettings(value); }
       return ok;
     };
+
+    // saveProduct and saveCashier call storage's INTERNAL save functions (not the
+    // wrapped properties above), so their writes would not reach the server.
+    // Wrap them too and mirror the affected collections from the fresh cache.
+    originals.saveProduct = storage.saveProduct;
+    storage.saveProduct = function (product) {
+      var ok = originals.saveProduct(product);
+      if (ok) {
+        pushCollection("menuItems", storage.getMenuItems());
+        pushCollection("inventoryProducts", storage.getInventoryProducts());
+      }
+      return ok;
+    };
+    originals.saveCashier = storage.saveCashier;
+    storage.saveCashier = function (cashier) {
+      var ok = originals.saveCashier(cashier);
+      if (ok) { pushCollection("cashiers", storage.getCashiers()); }
+      return ok;
+    };
   }
 
   // --- local cache hydration ----------------------------------------------
