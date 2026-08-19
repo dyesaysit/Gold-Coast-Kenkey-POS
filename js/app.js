@@ -57,6 +57,7 @@
   var IDLE_LOGOUT_MS = 15 * 60 * 1000; // auto-logout an unattended till
   var idleTimer = null;
   var loginTimer = null; // debounces server-mode login (see serverAttemptLogin)
+  var tablesRefreshTimer = null; // polls open tabs while the Tables screen is open
   var activeNavKey = "pos"; // only the POS screen exists at this stage
 
   var elements = {};
@@ -197,6 +198,18 @@
     elements.categoryError = document.getElementById("category-error");
     elements.categoryCancel = document.getElementById("category-cancel");
     elements.categorySave = document.getElementById("category-save");
+    elements.sfDineinEnabled = document.getElementById("sf-dinein-enabled");
+    elements.sfTablesActions = document.getElementById("sf-tables-actions");
+    elements.sfTablesCount = document.getElementById("sf-tables-count");
+    elements.tablesManage = document.getElementById("tables-manage");
+    elements.tablesModal = document.getElementById("tables-modal");
+    elements.tablesOverlay = document.getElementById("tables-overlay");
+    elements.tablesClose = document.getElementById("tables-close");
+    elements.tablesEditorList = document.getElementById("tables-editor-list");
+    elements.tablesAdd = document.getElementById("tables-add");
+    elements.tablesError = document.getElementById("tables-error");
+    elements.tablesCancel = document.getElementById("tables-cancel");
+    elements.tablesSave = document.getElementById("tables-save");
     elements.manageHint = document.getElementById("manage-hint");
     elements.manageList = document.getElementById("manage-list");
     elements.inventoryPrintFormat = document.getElementById("inventory-print-format");
@@ -734,6 +747,14 @@
     elements.settingsView.hidden = key !== "settings";
     elements.reportsView.hidden = key !== "reports";
     elements.salesHistoryView.hidden = key !== "sales-history";
+    // Live-refresh the Tables screen (server mode) so other devices' open tabs
+    // appear within a few seconds; stop polling when leaving it.
+    if (isTables && global.GCK.data && global.GCK.data.isServerMode()) {
+      startTablesPoll();
+    } else {
+      stopTablesPoll();
+    }
+
     if (isTables) {
       renderTables();
     } else if (isManage) {
@@ -799,6 +820,18 @@
     state.cart = [];
     renderCart();
     showSection("tables");
+  }
+
+  function startTablesPoll() {
+    if (tablesRefreshTimer) { return; }
+    tablesRefreshTimer = global.setInterval(function () {
+      global.GCK.data.refresh().then(function () {
+        if (activeNavKey === "tables") { renderTables(); }
+      });
+    }, 5000);
+  }
+  function stopTablesPoll() {
+    if (tablesRefreshTimer) { global.clearInterval(tablesRefreshTimer); tablesRefreshTimer = null; }
   }
 
   function showLogin() {
@@ -1961,6 +1994,20 @@
     elements.categoryCancel.addEventListener("click", closeCategoryEditor);
     elements.categoryClose.addEventListener("click", closeCategoryEditor);
     elements.categoryOverlay.addEventListener("click", closeCategoryEditor);
+
+    // Dine-in tables (settings + editor)
+    elements.sfDineinEnabled.addEventListener("change", toggleDineIn);
+    elements.tablesManage.addEventListener("click", openTablesEditor);
+    elements.tablesAdd.addEventListener("click", function () {
+      elements.tablesEditorList.appendChild(buildTableEditRow(null));
+    });
+    elements.tablesSave.addEventListener("click", saveTablesEditor);
+    elements.tablesCancel.addEventListener("click", closeTablesEditor);
+    elements.tablesClose.addEventListener("click", closeTablesEditor);
+    elements.tablesOverlay.addEventListener("click", closeTablesEditor);
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !elements.tablesModal.hidden) { closeTablesEditor(); }
+    });
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && !elements.categoryModal.hidden) {
         closeCategoryEditor();
@@ -2082,6 +2129,95 @@
     reloadCatalogue();             // refresh chips + product-form dropdown
     closeCategoryEditor();
     showToast("Categories saved.");
+  }
+
+  // --- Dine-in tables: settings toggle + editor (admin) --------------------
+
+  function refreshTablesSettings() {
+    var enabled = isDineIn();
+    if (elements.sfDineinEnabled) { elements.sfDineinEnabled.checked = enabled; }
+    if (elements.sfTablesActions) { elements.sfTablesActions.hidden = !enabled; }
+    if (elements.sfTablesCount) {
+      var n = storage.getTables().filter(function (t) { return t.active !== false; }).length;
+      elements.sfTablesCount.textContent = n + (n === 1 ? " table" : " tables");
+    }
+  }
+
+  function toggleDineIn() {
+    if (!isAdmin()) { elements.sfDineinEnabled.checked = isDineIn(); showToast("Admin access is required."); return; }
+    var settings = storage.getSettings() || {};
+    settings.serviceMode = elements.sfDineinEnabled.checked ? "dinein" : "takeaway";
+    storage.saveSettings(settings);
+    state.settings = settings;
+    state.serviceMode = settings.serviceMode;
+    refreshTablesSettings();
+    renderNav();
+    showToast(isDineIn() ? "Dine-in enabled." : "Dine-in turned off.");
+  }
+
+  function openTablesEditor() {
+    if (!isAdmin()) { showToast("Admin access is required."); return; }
+    setTablesError("");
+    renderTablesEditor(storage.getTables());
+    elements.tablesModal.hidden = false;
+  }
+  function closeTablesEditor() { elements.tablesModal.hidden = true; }
+  function setTablesError(message) { elements.tablesError.textContent = message; }
+
+  function renderTablesEditor(tables) {
+    elements.tablesEditorList.innerHTML = "";
+    tables.forEach(function (t) { elements.tablesEditorList.appendChild(buildTableEditRow(t)); });
+    if (tables.length === 0) { elements.tablesEditorList.appendChild(buildTableEditRow(null)); }
+  }
+
+  function buildTableEditRow(table) {
+    var row = document.createElement("div");
+    row.className = "cat-edit-row";
+    if (table && table.id) { row.setAttribute("data-table-id", table.id); }
+    var name = document.createElement("input");
+    name.className = "field__input cat-edit-row__name";
+    name.type = "text";
+    name.placeholder = "Table name";
+    name.value = table ? (table.name || "") : "";
+    var remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "btn btn--danger cat-edit-row__remove";
+    remove.textContent = "Remove";
+    remove.addEventListener("click", function () {
+      var id = row.getAttribute("data-table-id");
+      if (id && findTableOrder(id)) {
+        setTablesError("\"" + (name.value || "That table") + "\" has an open bill — settle it first.");
+        return;
+      }
+      row.remove();
+    });
+    row.appendChild(name);
+    row.appendChild(remove);
+    return row;
+  }
+
+  function saveTablesEditor() {
+    if (!isAdmin()) { showToast("Admin access is required."); return; }
+    var rows = elements.tablesEditorList.querySelectorAll(".cat-edit-row");
+    var tables = [];
+    var seen = {};
+    for (var i = 0; i < rows.length; i++) {
+      var nm = rows[i].querySelector(".cat-edit-row__name").value.trim();
+      if (!nm) { setTablesError("Every table needs a name (row " + (i + 1) + ")."); return; }
+      var key = nm.toLowerCase();
+      if (seen[key]) { setTablesError("Duplicate table name: \"" + nm + "\"."); return; }
+      seen[key] = true;
+      tables.push({
+        id: rows[i].getAttribute("data-table-id") || createId("table"),
+        name: nm,
+        active: true
+      });
+    }
+    storage.saveTables(tables);
+    state.tables = tables;
+    closeTablesEditor();
+    refreshTablesSettings();
+    showToast("Tables saved.");
   }
 
   function renderInventoryReport() {
@@ -3163,6 +3299,7 @@
     elements.settingsError.textContent = "";
     resetBackupSelection();
     setSettingsLogo(settings.logo || "");
+    refreshTablesSettings();
   }
 
   function resetBackupSelection() {
@@ -3326,7 +3463,10 @@
       receiptFooterNote: elements.sfReceiptFooter.value.trim(),
       receiptExtraInfo: elements.sfReceiptExtraInfo.value.trim(),
       receiptPaperWidth: elements.sfReceiptPaper.value === "58mm" ? "58mm" : "80mm",
-      dataVersion: oldSettings.dataVersion || 2
+      dataVersion: oldSettings.dataVersion || 2,
+      // Preserve flags managed elsewhere (the dine-in toggle, first-run marker).
+      serviceMode: oldSettings.serviceMode === "dinein" ? "dinein" : "takeaway",
+      setupComplete: oldSettings.setupComplete
     };
     if (!storage.saveSettings(settings)) { elements.settingsError.textContent = "Could not save settings."; return; }
     state.settings = settings;

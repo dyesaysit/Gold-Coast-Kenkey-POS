@@ -518,6 +518,15 @@ body {
 
 .tables-view__empty { color: var(--color-text-muted); }
 
+.settings-tables__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-weight: bold;
+  cursor: pointer;
+  margin: var(--space-sm) 0;
+}
+
 /* Cart banner naming the open table (dine-in). */
 .cart-table-banner {
   display: flex;
