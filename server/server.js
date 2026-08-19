@@ -27,12 +27,24 @@ var DB_FILE = path.join(DATA_DIR, "gckpos.db");
 // If the chosen port is busy the server hunts upward for a free one (below).
 var PORT = Number(process.env.PORT) || 4000;
 var MAX_PORT_TRIES = 15;
+// Bind localhost-only by default so a single-machine install never exposes the
+// (currently login-less) API to the network. Set GCKPOS_HOST=0.0.0.0 to allow
+// phones / other devices on the SAME TRUSTED Wi-Fi to connect.
+var HOST = process.env.GCKPOS_HOST || "127.0.0.1";
+var LAN_ENABLED = HOST === "0.0.0.0" || HOST === "::";
 
 // --- database bootstrap --------------------------------------------------
 if (!fs.existsSync(DATA_DIR)) { fs.mkdirSync(DATA_DIR, { recursive: true }); }
 var store = db.open(DB_FILE);
-var seeded = store.seedIfEmpty(seedLoader.loadSeedData(PROJECT_ROOT));
-if (seeded) { console.log("Seeded a fresh database with sample data."); }
+// A fresh install starts EMPTY so the app's first-run setup wizard runs — the
+// owner sets their OWN business name, admin PIN, currency and logo, and starts
+// with a few editable sample products. No demo accounts (no default PINs).
+// Set GCKPOS_SEED_DEMO=1 to preload the full demo catalogue for testing instead.
+if (process.env.GCKPOS_SEED_DEMO) {
+  if (store.seedIfEmpty(seedLoader.loadSeedData(PROJECT_ROOT))) {
+    console.log("Seeded the demo catalogue (GCKPOS_SEED_DEMO).");
+  }
+}
 
 // --- static file serving -------------------------------------------------
 var CONTENT_TYPES = {
@@ -242,16 +254,22 @@ var server = http.createServer(function (req, res) {
 });
 
 function announce(port) {
-  var nets = require("node:os").networkInterfaces();
-  var lan = null;
-  Object.keys(nets).forEach(function (iface) {
-    nets[iface].forEach(function (net) {
-      if (net.family === "IPv4" && !net.internal && !lan) { lan = net.address; }
-    });
-  });
   console.log("Gold Coast Kenkey POS server running.");
   console.log("  On this computer:   http://localhost:" + port);
-  if (lan) { console.log("  On phones (Wi-Fi):  http://" + lan + ":" + port); }
+  if (LAN_ENABLED) {
+    var nets = require("node:os").networkInterfaces();
+    var lan = null;
+    Object.keys(nets).forEach(function (iface) {
+      nets[iface].forEach(function (net) {
+        if (net.family === "IPv4" && !net.internal && !lan) { lan = net.address; }
+      });
+    });
+    if (lan) { console.log("  On phones (Wi-Fi):  http://" + lan + ":" + port); }
+    console.log("  NOTE: network access is ON and the API has no login yet —");
+    console.log("        only run this on a trusted private Wi-Fi.");
+  } else {
+    console.log("  (Local only. For phones on the same Wi-Fi: $env:GCKPOS_HOST='0.0.0.0'; npm start)");
+  }
   console.log("  Database file:      " + DB_FILE);
 }
 
@@ -280,7 +298,7 @@ function startServer(port, triesLeft) {
   }
   server.once("error", onError);
   server.once("listening", onListening);
-  server.listen(port, "0.0.0.0");
+  server.listen(port, HOST);
 }
 
 startServer(PORT, MAX_PORT_TRIES);

@@ -82,7 +82,35 @@ Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains
 Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 ```
 
-## 4. Reporting
+## 4. Phase 2 server (`server/`)
+
+The optional Phase 2 server adds a network surface, so it has its own posture.
+
+**Protections in place**
+- **Local only by default.** The server binds to `localhost`; exposing it to the
+  Wi-Fi is an explicit opt-in (`GCKPOS_HOST=0.0.0.0`), and that mode prints a
+  warning. A single-machine install is therefore not network-exposed at all.
+- **SQL injection safe.** All values use parameterized (`?`) queries; only fixed,
+  whitelisted table names are ever interpolated.
+- **Static serving** is limited to the browser files (server source, dotfiles,
+  and the database are never served) and guards against path traversal.
+- Request bodies are **size-capped** (20 MB); the security headers from §1 are
+  set on every response.
+
+**Known gaps to close before a real multi-device deployment**
+- **The REST API has no authentication.** Anyone who can reach the server
+  (i.e. any device on the Wi-Fi in LAN mode) can read all data and create,
+  modify, or wipe it — the client's role checks are not enforced server-side.
+  This is why LAN mode is opt-in and must run only on a trusted private network.
+  Fix: a server-side login (PIN → token) that gates the mutating/data endpoints.
+- **PINs are stored and served in plaintext** (`/api/bootstrap`, `/api/backup`).
+  Fix: hash PINs and verify them server-side.
+- **Sale totals are trusted from the client** (not recomputed server-side).
+
+These are tracked in `docs/ROADMAP.md` and are the main security work for a
+production, multi-device version.
+
+## 5. Reporting
 
 For a school project, raise any suspected security issue with the team rather
 than opening it publicly.

@@ -2,12 +2,46 @@
   "name": "gold-coast-kenkey-pos",
   "version": "2.0.0",
   "private": true,
-  "description": "Gold Coast Kenkey POS. The app runs client-side from index.html; the optional Phase 2 server (server/) adds a shared SQLite database for multi-device use.",
+  "author": "Omar Dye Ceesay",
+  "description": "Gold Coast Kenkey POS. Runs client-side from index.html; the Phase 2 server (server/) adds a shared SQLite database; the Electron wrapper (electron/) packages it as a desktop app with an installer.",
+  "main": "electron/main.js",
   "scripts": {
     "start": "node --experimental-sqlite --no-warnings server/server.js",
-    "test": "node --experimental-sqlite tests/server-db.test.js"
+    "test": "node --experimental-sqlite tests/server-db.test.js",
+    "electron": "electron .",
+    "dist": "electron-builder --win"
   },
   "engines": {
     "node": ">=22.5.0"
+  },
+  "devDependencies": {
+    "electron": "^43.4.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.chopchop.pos",
+    "productName": "Chop Chop POS",
+    "asar": false,
+    "files": [
+      "electron/**",
+      "server/**",
+      "js/**",
+      "css/**",
+      "images/**",
+      "index.html",
+      "!server/data/**",
+      "!**/*.test.js"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Chop Chop POS"
+    }
   }
 }
