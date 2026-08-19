@@ -129,15 +129,102 @@ function readBody(req, callback) {
   req.on("error", function () { callback({ parseError: true }); });
 }
 
+// --- authentication ------------------------------------------------------
+// A login (PIN -> token) gates the mutating and secret-bearing endpoints, so
+// the API is not wide open on the network. Tokens are in-memory (cleared on
+// restart, which is fine — clients re-authenticate). PINs are verified against
+// hashes in the database (server/db.js), never in plaintext.
+var crypto = require("node:crypto");
+var sessions = {};        // token -> { user }
+var loginGuard = {};      // ip -> { fails, lockUntil }  (rate-limit login)
+var LOGIN_MAX_FAILS = 5;
+var LOGIN_LOCK_MS = 30000;
+
+function issueToken(user) {
+  var token = crypto.randomBytes(24).toString("hex");
+  sessions[token] = { user: user };
+  return token;
+}
+function tokenUser(req) {
+  var h = req.headers.authorization || "";
+  var m = /^Bearer\s+(.+)$/i.exec(h);
+  return m && sessions[m[1]] ? sessions[m[1]].user : null;
+}
+function clientIp(req) { return (req.socket && req.socket.remoteAddress) || "unknown"; }
+function requireAuth(req, res) {
+  if (tokenUser(req)) { return true; }
+  sendJson(res, 401, { ok: false, error: "Sign in required." });
+  return false;
+}
+
 // --- API routes ----------------------------------------------------------
 function handleApi(req, res, urlPath) {
   var method = req.method;
   var parts = urlPath.split("?")[0].split("/").filter(Boolean); // ["api", ...]
 
-  // GET /api/health
+  // GET /api/health  (public) — also reports whether first-run setup is needed
   if (method === "GET" && parts.length === 2 && parts[1] === "health") {
     var settings = store.getSettings() || {};
-    sendJson(res, 200, { ok: true, mode: "server", businessName: settings.businessName || "" });
+    sendJson(res, 200, {
+      ok: true, mode: "server",
+      businessName: settings.businessName || "",
+      setupRequired: !store.anyCashier()
+    });
+    return;
+  }
+
+  // POST /api/login  (public) — verify a PIN against the stored hash, issue token
+  if (method === "POST" && parts[1] === "login" && parts.length === 2) {
+    var ip = clientIp(req);
+    var g = loginGuard[ip] || { fails: 0, lockUntil: 0 };
+    if (g.lockUntil > Date.now()) {
+      sendJson(res, 429, { ok: false, locked: true, error: "Too many attempts. Try again shortly." });
+      return;
+    }
+    readBody(req, function (body) {
+      var pin = body && body.value && body.value.pin;
+      var user = pin ? store.verifyLogin(String(pin)) : null;
+      if (user) {
+        loginGuard[ip] = { fails: 0, lockUntil: 0 };
+        sendJson(res, 200, { ok: true, token: issueToken(user), user: user });
+      } else {
+        g.fails += 1;
+        if (g.fails >= LOGIN_MAX_FAILS) { g.fails = 0; g.lockUntil = Date.now() + LOGIN_LOCK_MS; }
+        loginGuard[ip] = g;
+        sendJson(res, 401, { ok: false, locked: g.lockUntil > Date.now(), error: "Incorrect PIN." });
+      }
+    });
+    return;
+  }
+
+  // GET /api/me  — validate a token (used to restore a session after reload)
+  if (method === "GET" && parts[1] === "me" && parts.length === 2) {
+    var me = tokenUser(req);
+    if (me) { sendJson(res, 200, { ok: true, user: me }); } else { sendJson(res, 401, { ok: false }); }
+    return;
+  }
+
+  // POST /api/setup  (public, first-run ONLY) — create settings + admin + samples
+  if (method === "POST" && parts[1] === "setup" && parts.length === 2) {
+    if (store.anyCashier()) { sendJson(res, 403, { ok: false, error: "Already set up." }); return; }
+    readBody(req, function (body) {
+      var v = body && body.value;
+      if (!v || typeof v !== "object" || !v.settings || !v.admin || !v.admin.pin) {
+        sendJson(res, 400, { ok: false, error: "Invalid setup data." });
+        return;
+      }
+      try {
+        store.saveSettings(v.settings);
+        store.replaceCollection("cashiers", [v.admin]);
+        store.replaceCollection("categories", Array.isArray(v.categories) ? v.categories : []);
+        store.replaceCollection("inventoryProducts", Array.isArray(v.products) ? v.products : []);
+        var user = store.verifyLogin(String(v.admin.pin));
+        if (!user) { sendJson(res, 500, { ok: false, error: "Setup failed." }); return; }
+        sendJson(res, 200, { ok: true, token: issueToken(user), user: user });
+      } catch (error) {
+        sendJson(res, 500, { ok: false, error: "Setup could not be saved." });
+      }
+    });
     return;
   }
 
@@ -155,6 +242,7 @@ function handleApi(req, res, urlPath) {
 
   // POST /api/sales  -> atomic checkout (server assigns the receipt number)
   if (method === "POST" && parts[1] === "sales" && parts.length === 2) {
+    if (!requireAuth(req, res)) { return; }
     readBody(req, function (body) {
       if (body.tooBig) { sendJson(res, 413, { ok: false, error: "Payload too large" }); return; }
       if (body.parseError || !body.value || typeof body.value !== "object") {
@@ -175,6 +263,7 @@ function handleApi(req, res, urlPath) {
   if (parts[1] === "settings" && parts.length === 2) {
     if (method === "GET") { sendJson(res, 200, { ok: true, settings: store.getSettings() }); return; }
     if (method === "PUT") {
+      if (!requireAuth(req, res)) { return; }
       readBody(req, function (body) {
         if (body.parseError || !body.value || typeof body.value !== "object" || Array.isArray(body.value)) {
           sendJson(res, 400, { ok: false, error: "Invalid settings" });
@@ -189,6 +278,7 @@ function handleApi(req, res, urlPath) {
 
   // PUT /api/collections/:name  -> replace a whole catalogue collection
   if (method === "PUT" && parts[1] === "collections" && parts.length === 3) {
+    if (!requireAuth(req, res)) { return; }
     var name = parts[2];
     readBody(req, function (body) {
       if (body.parseError || body.value === null || body.value === undefined) {
@@ -205,8 +295,9 @@ function handleApi(req, res, urlPath) {
     return;
   }
 
-  // GET /api/backup  -> download a gckpos-backup file
+  // GET /api/backup  -> download a gckpos-backup file (includes PIN hashes)
   if (method === "GET" && parts[1] === "backup" && parts.length === 2) {
+    if (!requireAuth(req, res)) { return; }
     var backup = store.exportBackup(new Date());
     applyBaseHeaders(res);
     res.writeHead(200, {
@@ -219,6 +310,7 @@ function handleApi(req, res, urlPath) {
 
   // POST /api/restore  -> replace ALL data from a gckpos-backup file
   if (method === "POST" && parts[1] === "restore" && parts.length === 2) {
+    if (!requireAuth(req, res)) { return; }
     readBody(req, function (body) {
       if (body.tooBig) { sendJson(res, 413, { ok: false, error: "Backup file too large" }); return; }
       if (body.parseError || !body.value) { sendJson(res, 400, { ok: false, error: "Invalid backup file" }); return; }

@@ -87,6 +87,17 @@ Header always set Content-Security-Policy "default-src 'self'; script-src 'self'
 The optional Phase 2 server adds a network surface, so it has its own posture.
 
 **Protections in place**
+- **Server-side login (PIN → token).** `POST /api/login` verifies the PIN and
+  issues a session token; the mutating and secret-bearing endpoints
+  (`POST /api/sales`, `PUT /api/collections/*`, `PUT /api/settings`,
+  `GET /api/backup`, `POST /api/restore`) require it. The API is no longer open
+  for writes, and login is rate-limited (lockout after repeated failures).
+- **PINs are hashed** (scrypt + per-user salt), never stored or served in
+  plaintext. `/api/bootstrap` exposes only names/roles; the hash appears only in
+  an authenticated `/api/backup` (so a restore keeps logins working).
+- **First-run setup** uses a one-time `POST /api/setup` that works only while no
+  admin exists, so the owner creates the first admin without a chicken-and-egg
+  token problem.
 - **Local only by default.** The server binds to `localhost`; exposing it to the
   Wi-Fi is an explicit opt-in (`GCKPOS_HOST=0.0.0.0`), and that mode prints a
   warning. A single-machine install is therefore not network-exposed at all.
@@ -97,18 +108,16 @@ The optional Phase 2 server adds a network surface, so it has its own posture.
 - Request bodies are **size-capped** (20 MB); the security headers from §1 are
   set on every response.
 
-**Known gaps to close before a real multi-device deployment**
-- **The REST API has no authentication.** Anyone who can reach the server
-  (i.e. any device on the Wi-Fi in LAN mode) can read all data and create,
-  modify, or wipe it — the client's role checks are not enforced server-side.
-  This is why LAN mode is opt-in and must run only on a trusted private network.
-  Fix: a server-side login (PIN → token) that gates the mutating/data endpoints.
-- **PINs are stored and served in plaintext** (`/api/bootstrap`, `/api/backup`).
-  Fix: hash PINs and verify them server-side.
+**Remaining hardening (acceptable on a trusted Wi-Fi)**
+- **Read endpoints are not gated.** `GET /api/bootstrap` and `GET /api/sales`
+  are readable without a token (catalogue, settings, sales history — but no
+  PINs) so the login screen can render before sign-in. Gating these behind a
+  login-first startup is a further step.
 - **Sale totals are trusted from the client** (not recomputed server-side).
+- **Tokens are in memory** (cleared on server restart, when clients re-log-in)
+  and sent over HTTP on the LAN; a production deployment would add HTTPS.
 
-These are tracked in `docs/ROADMAP.md` and are the main security work for a
-production, multi-device version.
+These are tracked in `docs/ROADMAP.md`.
 
 ## 5. Reporting
 

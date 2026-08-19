@@ -48,6 +48,23 @@ if (typeof DatabaseSync !== "function") {
   throw new Error("node:sqlite loaded but DatabaseSync is missing; upgrade to Node 22.5+.");
 }
 
+var crypto = require("node:crypto");
+
+// PINs are stored HASHED (scrypt + per-user salt), never in plaintext, so a
+// leaked database file does not reveal them. Format: "<saltHex>:<hashHex>".
+function hashPin(pin) {
+  var salt = crypto.randomBytes(16).toString("hex");
+  var hash = crypto.scryptSync(String(pin), salt, 32).toString("hex");
+  return salt + ":" + hash;
+}
+function verifyPinHash(pin, stored) {
+  if (!stored || String(stored).indexOf(":") === -1) { return false; }
+  var parts = String(stored).split(":");
+  var expected = Buffer.from(parts[1], "hex");
+  var actual = crypto.scryptSync(String(pin), parts[0], 32);
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+}
+
 // storage key <-> collection name, matching storage-service.js KEYS exactly.
 var COLLECTIONS = [
   { name: "categories", key: "gckpos.categories" },
@@ -87,7 +104,7 @@ var SCHEMA = [
     "id TEXT PRIMARY KEY, name TEXT NOT NULL, display_order INTEGER, active INTEGER)",
 
   "CREATE TABLE IF NOT EXISTS cashiers (" +
-    "id TEXT PRIMARY KEY, name TEXT NOT NULL, pin TEXT, role TEXT, active INTEGER)",
+    "id TEXT PRIMARY KEY, name TEXT NOT NULL, pin_hash TEXT, role TEXT, active INTEGER)",
 
   "CREATE TABLE IF NOT EXISTS proteins (" +
     "id TEXT PRIMARY KEY, name TEXT NOT NULL, additional_price REAL, active INTEGER)",
@@ -162,12 +179,14 @@ function open(filePath) {
   var db = new DatabaseSync(filePath, { enableForeignKeyConstraints: false });
   db.exec("PRAGMA journal_mode = WAL");
 
-  // Upgrade guard: an earlier build stored each table as (seq, doc) JSON blobs.
-  // That layout is incompatible with the normalized schema below, so if it is
-  // detected, drop the old tables and rebuild. Data returns via a JSON backup
+  // Upgrade guard: rebuild databases from earlier incompatible layouts — the
+  // original (seq, doc) JSON blobs, or the first normalized schema that stored a
+  // plaintext `pin` column (before PIN hashing). Data returns via a JSON backup
   // restore (the backup format is schema-independent).
   var categoriesInfo = db.prepare("PRAGMA table_info(categories)").all();
-  var isOldSchema = categoriesInfo.some(function (c) { return c.name === "doc"; });
+  var cashiersInfo = db.prepare("PRAGMA table_info(cashiers)").all();
+  var isOldSchema = categoriesInfo.some(function (c) { return c.name === "doc"; }) ||
+    cashiersInfo.some(function (c) { return c.name === "pin"; });
   if (isOldSchema) {
     ["categories", "menu_items", "portions", "proteins", "extras", "inventory_products",
      "cashiers", "sales", "settings", "menu_item_extras", "portion_proteins", "sale_items"]
@@ -190,9 +209,13 @@ function open(filePath) {
     });
   }
 
-  function readCashiers() {
+  // Bootstrap reads (includeSecret=false) never expose the hash; only backup
+  // export (includeSecret=true) includes pinHash so a restore keeps logins.
+  function readCashiers(includeSecret) {
     return db.prepare("SELECT * FROM cashiers ORDER BY rowid").all().map(function (r) {
-      return { id: r.id, name: r.name, pin: r.pin, role: r.role, active: toBool(r.active) };
+      var c = { id: r.id, name: r.name, role: r.role, active: toBool(r.active) };
+      if (includeSecret) { c.pinHash = r.pin_hash; }
+      return c;
     });
   }
 
@@ -316,9 +339,20 @@ function open(filePath) {
     (items || []).forEach(function (c) { ins.run(c.id, c.name, orNull(c.displayOrder), to01(c.active)); });
   }
   function fillCashiers(items) {
+    // Preserve existing hashes so a save that omits PINs (the client cache never
+    // holds them) does not wipe them. A plaintext `pin` is hashed; a `pinHash`
+    // (from a server backup) is kept verbatim.
+    var existing = {};
+    db.prepare("SELECT id, pin_hash FROM cashiers").all().forEach(function (r) { existing[r.id] = r.pin_hash; });
     db.exec("DELETE FROM cashiers");
-    var ins = db.prepare("INSERT INTO cashiers (id, name, pin, role, active) VALUES (?, ?, ?, ?, ?)");
-    (items || []).forEach(function (c) { ins.run(c.id, c.name, orNull(c.pin), orNull(c.role), to01(c.active)); });
+    var ins = db.prepare("INSERT INTO cashiers (id, name, pin_hash, role, active) VALUES (?, ?, ?, ?, ?)");
+    (items || []).forEach(function (c) {
+      var pinHash;
+      if (c.pin !== undefined && c.pin !== null && c.pin !== "") { pinHash = hashPin(c.pin); }
+      else if (c.pinHash) { pinHash = c.pinHash; }
+      else { pinHash = existing[c.id] || null; }
+      ins.run(c.id, c.name, pinHash, orNull(c.role), to01(c.active));
+    });
   }
   function fillProteins(items) {
     db.exec("DELETE FROM proteins");
@@ -422,6 +456,20 @@ function open(filePath) {
   function getSettings() { return readSettings(); }
   function getSales() { return readSales(); }
 
+  function anyCashier() { return db.prepare("SELECT COUNT(*) AS n FROM cashiers").get().n > 0; }
+
+  // Verify a PIN against active users' stored hashes. Returns the session-safe
+  // user (id, name, role) on success, or null. Used by /api/login server-side.
+  function verifyLogin(pin) {
+    var rows = db.prepare("SELECT id, name, role, active, pin_hash FROM cashiers").all();
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].active && verifyPinHash(pin, rows[i].pin_hash)) {
+        return { id: rows[i].id, name: rows[i].name, role: rows[i].role };
+      }
+    }
+    return null;
+  }
+
   function isEmpty() {
     var tables = ["categories", "cashiers", "proteins", "extras", "menu_items", "portions", "inventory_products", "sales", "settings"];
     for (var i = 0; i < tables.length; i++) {
@@ -521,6 +569,9 @@ function open(filePath) {
     var data = getAll();
     var settings = data[KEYS.settings] || {};
     data[KEYS.settings] = settings;
+    // Include the PIN hashes in a backup so a restore keeps logins working
+    // (bootstrap never exposes them).
+    data[KEYS.cashiers] = readCashiers(true);
     return {
       backupFormat: BACKUP_FORMAT_NAME,
       backupFormatVersion: BACKUP_FORMAT_VERSION,
@@ -582,6 +633,8 @@ function open(filePath) {
     COLLECTIONS: COLLECTIONS,
     getCollection: getCollection,
     getAll: getAll,
+    verifyLogin: verifyLogin,
+    anyCashier: anyCashier,
     getSettings: getSettings,
     getSales: getSales,
     isEmpty: isEmpty,

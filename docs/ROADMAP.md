@@ -104,9 +104,13 @@ backup/restore) is **implemented** — see `server/` and
 server-mode detection, so the Phase 1 standalone app is unchanged and still runs
 with no server.
 
+Server-side authentication is now implemented: `/api/login` verifies a PIN and
+issues a token that gates the mutating/secret endpoints, and PINs are hashed
+(scrypt), never stored or served in plaintext — see `docs/SECURITY.md` §4.
+
 Still open as future refinements:
 - **Live push** so already-open screens on other devices update without a reload
   or window refocus (today a device pulls fresh data on load and on focus).
-- **Server-side PIN hashing** once authentication moves to the server
-  (`docs/SECURITY.md`).
+- **Gate the read endpoints** (`/api/bootstrap`, `/api/sales`) behind a
+  login-first startup, and add **HTTPS** for LAN traffic (`docs/SECURITY.md`).
 - The **full slide-up cart drawer** (mobile UX item above).

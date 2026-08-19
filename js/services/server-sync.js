@@ -24,6 +24,22 @@
   var serverMode = false;
   var originals = {};
 
+  // Session token from /api/login or /api/setup, sent on the gated endpoints.
+  // Persisted so a reload keeps the session; validated against the server at
+  // startup (a token is in-memory server-side, so it dies on a server restart).
+  var TOKEN_KEY = "gckpos.serverToken";
+  var token = null;
+  var serverAuthed = false;
+  function loadToken() { try { token = global.localStorage.getItem(TOKEN_KEY) || null; } catch (e) { token = null; } }
+  function setToken(t) {
+    token = t || null;
+    try {
+      if (t) { global.localStorage.setItem(TOKEN_KEY, t); }
+      else { global.localStorage.removeItem(TOKEN_KEY); }
+    } catch (e) { /* ignore */ }
+  }
+  function isAuthenticated() { return serverAuthed; }
+
   // Catalogue collections mirrored to the server. saveProduct/saveCashier call
   // these internally, so wrapping these covers those too. Cart/session are
   // intentionally excluded (per-device).
@@ -43,7 +59,11 @@
     if (typeof console !== "undefined" && console.warn) { console.warn("[server-sync] " + message); }
   }
 
-  function jsonHeaders() { return { "Content-Type": "application/json" }; }
+  function jsonHeaders() {
+    var h = { "Content-Type": "application/json" };
+    if (token) { h.Authorization = "Bearer " + token; }
+    return h;
+  }
 
   // --- write mirroring -----------------------------------------------------
 
@@ -128,13 +148,51 @@
       .then(function (health) {
         if (!health || !health.ok) { return { serverMode: false }; }
         serverMode = true;
-        return fetchBootstrap().then(function () {
-          wrapWrites();
-          return { serverMode: true };
+        loadToken();
+        return validateToken().then(function () {
+          return fetchBootstrap().then(function () {
+            wrapWrites();
+            return { serverMode: true, authenticated: serverAuthed };
+          });
         });
       })
       .catch(function () { serverMode = false; return { serverMode: false }; });
   }
+
+  // Confirm a stored token is still valid server-side (it dies on a server
+  // restart). Clears it if not, so the app falls back to the login screen.
+  function validateToken() {
+    if (!token) { serverAuthed = false; return global.Promise.resolve(false); }
+    return global.fetch("/api/me", { headers: jsonHeaders() })
+      .then(function (res) { serverAuthed = res.ok; if (!res.ok) { setToken(null); } return serverAuthed; })
+      .catch(function () { serverAuthed = false; return false; });
+  }
+
+  // --- authentication ------------------------------------------------------
+
+  function login(pin) {
+    if (!serverMode) { return global.Promise.resolve({ ok: false, message: "Not in server mode." }); }
+    return global.fetch("/api/login", { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ pin: pin }) })
+      .then(function (res) { return res.json().catch(function () { return {}; }).then(function (b) { return { res: res, b: b }; }); })
+      .then(function (r) {
+        if (r.res.ok && r.b.ok) { setToken(r.b.token); serverAuthed = true; return { ok: true, user: r.b.user }; }
+        return { ok: false, message: r.b.error || "Incorrect PIN.", locked: !!r.b.locked };
+      })
+      .catch(function () { return { ok: false, message: "Could not reach the server." }; });
+  }
+
+  // First-run only: create settings + admin + samples on the server, get a token.
+  function setup(payload) {
+    return global.fetch("/api/setup", { method: "POST", headers: jsonHeaders(), body: JSON.stringify(payload) })
+      .then(function (res) { return res.json().catch(function () { return {}; }).then(function (b) { return { res: res, b: b }; }); })
+      .then(function (r) {
+        if (r.res.ok && r.b.ok) { setToken(r.b.token); serverAuthed = true; return { ok: true, user: r.b.user }; }
+        return { ok: false, message: r.b.error || "Setup failed." };
+      })
+      .catch(function () { return { ok: false, message: "Could not reach the server." }; });
+  }
+
+  function logout() { setToken(null); serverAuthed = false; }
 
   /** Pull the latest server snapshot into the local cache (no re-render here). */
   function refresh() {
@@ -192,7 +250,7 @@
 
   /** Server-mode export: download the authoritative backup from the database. */
   function fetchServerBackup() {
-    return global.fetch("/api/backup")
+    return global.fetch("/api/backup", { headers: jsonHeaders() })
       .then(function (res) {
         if (!res.ok) { return { ok: false, message: "Could not download the backup from the server." }; }
         return res.text().then(function (json) { return { ok: true, json: json, filename: backupFilename() }; });
@@ -220,6 +278,10 @@
     bootstrap: bootstrap,
     refresh: refresh,
     isServerMode: isServerMode,
+    isAuthenticated: isAuthenticated,
+    login: login,
+    setup: setup,
+    logout: logout,
     completeSale: completeSale,
     fetchServerBackup: fetchServerBackup,
     restoreOnServer: restoreOnServer

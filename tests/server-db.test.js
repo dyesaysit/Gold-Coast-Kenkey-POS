@@ -57,7 +57,15 @@ assert(store.seedIfEmpty(realSeed), "seed the real catalogue");
 var all = store.getAll();
 
 assertDeepEqual(all[KEYS.categories], realSeed.categories, "categories round-trip");
-assertDeepEqual(all[KEYS.cashiers], realSeed.cashiers, "cashiers round-trip");
+// Cashiers round-trip WITHOUT their PIN (hashed + never exposed via bootstrap).
+assertDeepEqual(all[KEYS.cashiers], realSeed.cashiers.map(function (c) {
+  return { id: c.id, name: c.name, role: c.role, active: c.active };
+}), "cashiers round-trip without pin");
+assert(all[KEYS.cashiers].every(function (c) { return !("pin" in c) && !("pinHash" in c); }), "bootstrap never exposes pin/pinHash");
+// PIN login is verified server-side against the stored hash.
+assert(!!store.verifyLogin("3333"), "admin logs in with the seeded PIN");
+assertEqual(store.verifyLogin("3333").role, "admin", "verifyLogin returns the right role");
+assertEqual(store.verifyLogin("0000"), null, "wrong PIN does not log in");
 assertDeepEqual(all[KEYS.proteins], realSeed.proteins, "proteins round-trip");
 assertDeepEqual(all[KEYS.extras], realSeed.extras, "extras round-trip");
 assertDeepEqual(all[KEYS.menuItems], realSeed.menuItems, "menuItems round-trip (incl. portionIds + allowedExtraIds)");
@@ -128,6 +136,7 @@ assertEqual(backup.appDataVersion, 2, "app data version from settings");
 var restored = db.open(":memory:");
 assert(restored.importBackup(backup).ok, "importBackup accepts the backup");
 assertEqual(diff(restored.getAll(), store.getAll()), null, "restored database matches the source exactly");
+assert(!!restored.verifyLogin("3333"), "login still works after a backup restore (pin hash preserved)");
 assert(!restored.importBackup({ backupFormat: "nope" }).ok, "rejects a non-POS file");
 
 store.close(); behave.close(); restored.close();

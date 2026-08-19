@@ -52,6 +52,7 @@
   var PIN_LOCK_MS = 30000;
   var IDLE_LOGOUT_MS = 15 * 60 * 1000; // auto-logout an unattended till
   var idleTimer = null;
+  var loginTimer = null; // debounces server-mode login (see serverAttemptLogin)
   var activeNavKey = "pos"; // only the POS screen exists at this stage
 
   var elements = {};
@@ -521,6 +522,12 @@
    * and a full-length wrong PIN shows an error and resets.
    */
   function attemptLogin() {
+    // Server mode verifies the PIN against the server (hashed); local mode keeps
+    // the instant per-digit local check.
+    if (global.GCK.data && global.GCK.data.isServerMode()) {
+      serverAttemptLogin();
+      return;
+    }
     var result = auth.login(pinBuffer); // persists the session only on success
     if (result.valid) {
       failedPinAttempts = 0;
@@ -544,8 +551,42 @@
     }
   }
 
+  // Server-mode login. PINs are 4–6 digits, so instead of a network call per
+  // keystroke, debounce: submit once the user pauses (or at the 6-digit max), so
+  // a partial PIN is not sent — and counted as a failed attempt — mid-entry.
+  function serverAttemptLogin() {
+    if (loginTimer) { global.clearTimeout(loginTimer); loginTimer = null; }
+    if (pinBuffer.length < auth.MIN_PIN_LENGTH) { return; }
+    function submit() {
+      loginTimer = null;
+      global.GCK.data.login(pinBuffer).then(function (res) {
+        if (res.ok) {
+          failedPinAttempts = 0;
+          pinLockUntil = 0;
+          currentUser = res.user;
+          storage.saveSession(res.user);
+          clearPin();
+          showPos();
+          showToast("Welcome, " + currentUser.name + ".");
+        } else {
+          pinBuffer = "";
+          renderPinDots();
+          if (res.locked) {
+            pinLockUntil = Date.now() + PIN_LOCK_MS;
+            setLoginError("Too many attempts. Locked for " + (PIN_LOCK_MS / 1000) + " seconds.");
+          } else {
+            setLoginError(res.message || "Incorrect PIN. Try again.");
+          }
+        }
+      });
+    }
+    if (pinBuffer.length >= auth.MAX_PIN_LENGTH) { submit(); }
+    else { loginTimer = global.setTimeout(submit, 450); }
+  }
+
   function handleLogout() {
     auth.logout();
+    if (global.GCK.data && global.GCK.data.logout) { global.GCK.data.logout(); }
     currentUser = null;
     resetIdleTimer(); // clears the pending timer now that no one is signed in
     showLogin();
@@ -741,54 +782,76 @@
       dataVersion: 2,
       setupComplete: true
     };
-    storage.saveSettings(settings);
 
     var admin = { id: createId("user"), name: "Admin", pin: pin, role: "admin", active: true };
+
+    // Server mode: create everything on the server in one first-run call (which
+    // hashes the PIN and returns a session token), then hydrate and sign in.
+    if (global.GCK.data && global.GCK.data.isServerMode()) {
+      var sample = buildSampleCatalogue();
+      elements.setupSubmit.disabled = true;
+      global.GCK.data.setup({ settings: settings, admin: admin, categories: sample.categories, products: sample.products })
+        .then(function (res) {
+          elements.setupSubmit.disabled = false;
+          if (!res.ok) { setSetupError(res.message || "Setup could not be saved. Please try again."); return; }
+          global.GCK.data.refresh().then(function () {
+            finishSetup(settings, res.user, name);
+          });
+        });
+      return;
+    }
+
+    storage.saveSettings(settings);
     storage.saveCashiers([admin]);
     seedSampleCatalogue();
     storage.clearCurrentCart();
+    auth.login(pin);
+    finishSetup(settings, auth.getCurrentUser(), name);
+  }
 
-    // Load the new data, apply currency, and sign the admin in.
+  // Shared tail of setup: load the new data, apply currency/branding, sign in.
+  function finishSetup(settings, user, businessName) {
     loadState();
     money.setCurrencySymbol(settings.currencySymbol);
     applyBranding();
     renderCategories();
     renderProducts();
     renderCart();
-    auth.login(pin);
-    currentUser = auth.getCurrentUser();
+    currentUser = user;
+    if (user) { storage.saveSession(user); }
     elements.setupView.hidden = true;
     showPos();
-    showToast("Setup complete. Welcome, " + name + "!");
+    showToast("Setup complete. Welcome, " + businessName + "!");
+  }
+
+  /** Build one editable category + a few simple sample products (no writes). */
+  function buildSampleCatalogue() {
+    var categoryId = createId("cat");
+    var defs = [
+      { name: "Sample Meal", price: 25 },
+      { name: "Bottled Water", price: 3 },
+      { name: "Soft Drink", price: 10 }
+    ];
+    var products = defs.map(function (d) {
+      return {
+        id: createId("product"), name: d.name, categoryId: categoryId,
+        productType: "simple", itemType: "inventory-product", image: "",
+        sellingPrice: d.price, trackInventory: false,
+        stockQuantity: null, lowStockLevel: null, active: true
+      };
+    });
+    return {
+      categories: [{ id: categoryId, name: "Sample Menu", displayOrder: 1, active: true }],
+      products: products
+    };
   }
 
   /** Seed one editable category + a few simple sample products (if empty). */
   function seedSampleCatalogue() {
     if (storage.getCategories().length > 0 || storage.getProducts().length > 0) { return; }
-    var categoryId = createId("cat");
-    storage.saveCategories([
-      { id: categoryId, name: "Sample Menu", displayOrder: 1, active: true }
-    ]);
-    var samples = [
-      { name: "Sample Meal", price: 25 },
-      { name: "Bottled Water", price: 3 },
-      { name: "Soft Drink", price: 10 }
-    ];
-    for (var i = 0; i < samples.length; i++) {
-      storage.saveProduct({
-        id: createId("product"),
-        name: samples[i].name,
-        categoryId: categoryId,
-        productType: "simple",
-        itemType: "inventory-product",
-        image: "",
-        sellingPrice: samples[i].price,
-        trackInventory: false,
-        stockQuantity: null,
-        lowStockLevel: null,
-        active: true
-      });
-    }
+    var sample = buildSampleCatalogue();
+    storage.saveCategories(sample.categories);
+    sample.products.forEach(function (p) { storage.saveProduct(p); });
   }
 
   function renderUserArea() {
@@ -3774,11 +3837,15 @@
     renderProducts();
     renderCart();
 
-    // Restore a previous session if one exists, otherwise show the login pad.
+    // Restore a previous session if one exists. In server mode the session is
+    // only trusted when the server token is still valid (checked at bootstrap);
+    // otherwise fall back to the login pad so the PIN is re-verified server-side.
     currentUser = auth.getCurrentUser();
-    if (currentUser) {
+    var serverMode = global.GCK.data && global.GCK.data.isServerMode();
+    if (currentUser && (!serverMode || global.GCK.data.isAuthenticated())) {
       showPos();
     } else {
+      if (currentUser && serverMode) { storage.clearSession(); currentUser = null; }
       showLogin();
     }
   }
