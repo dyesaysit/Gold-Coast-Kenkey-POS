@@ -75,7 +75,9 @@ var COLLECTIONS = [
   { name: "inventoryProducts", key: "gckpos.inventoryProducts" },
   { name: "cashiers", key: "gckpos.cashiers" },
   { name: "sales", key: "gckpos.sales" },
-  { name: "settings", key: "gckpos.settings" }
+  { name: "settings", key: "gckpos.settings" },
+  { name: "tables", key: "gckpos.tables" },
+  { name: "tableOrders", key: "gckpos.tableOrders" }
 ];
 var KEYS = {};
 COLLECTIONS.forEach(function (c) { KEYS[c.name] = c.key; });
@@ -149,6 +151,11 @@ var SCHEMA = [
 
   "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)",
 
+  // Dine-in: tables (config) and their open running tabs (one row per seated
+  // table; the tab items live in doc, a nested snapshot like sale_items).
+  "CREATE TABLE IF NOT EXISTS tables (id TEXT PRIMARY KEY, name TEXT NOT NULL, active INTEGER)",
+  "CREATE TABLE IF NOT EXISTS table_orders (table_id TEXT PRIMARY KEY, doc TEXT NOT NULL)",
+
   "CREATE INDEX IF NOT EXISTS idx_sales_receipt ON sales(receipt_number)",
   "CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at)",
   "CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)",
@@ -189,7 +196,8 @@ function open(filePath) {
     cashiersInfo.some(function (c) { return c.name === "pin"; });
   if (isOldSchema) {
     ["categories", "menu_items", "portions", "proteins", "extras", "inventory_products",
-     "cashiers", "sales", "settings", "menu_item_extras", "portion_proteins", "sale_items"]
+     "cashiers", "sales", "settings", "menu_item_extras", "portion_proteins", "sale_items",
+     "tables", "table_orders"]
       .forEach(function (t) { db.exec("DROP TABLE IF EXISTS " + t); });
   }
 
@@ -301,6 +309,17 @@ function open(filePath) {
     return out;
   }
 
+  function readTables() {
+    return db.prepare("SELECT * FROM tables ORDER BY rowid").all().map(function (r) {
+      return { id: r.id, name: r.name, active: toBool(r.active) };
+    });
+  }
+
+  function readTableOrders() {
+    return db.prepare("SELECT doc FROM table_orders ORDER BY rowid").all()
+      .map(function (r) { return JSON.parse(r.doc); });
+  }
+
   function readSaleItems(saleId) {
     return db.prepare("SELECT details FROM sale_items WHERE sale_id = ? ORDER BY seq").all(saleId)
       .map(function (r) { return JSON.parse(r.details); });
@@ -402,6 +421,16 @@ function open(filePath) {
     var ins = db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)");
     Object.keys(obj).forEach(function (key) { ins.run(key, JSON.stringify(obj[key])); });
   }
+  function fillTables(items) {
+    db.exec("DELETE FROM tables");
+    var ins = db.prepare("INSERT INTO tables (id, name, active) VALUES (?, ?, ?)");
+    (items || []).forEach(function (t) { ins.run(t.id, t.name, to01(t.active)); });
+  }
+  function fillTableOrders(items) {
+    db.exec("DELETE FROM table_orders");
+    var ins = db.prepare("INSERT OR REPLACE INTO table_orders (table_id, doc) VALUES (?, ?)");
+    (items || []).forEach(function (o) { ins.run(o.tableId, JSON.stringify(o)); });
+  }
 
   function insertSaleRow(sale) {
     var cashier = sale.cashier || null;
@@ -443,6 +472,8 @@ function open(filePath) {
       case "cashiers": return readCashiers();
       case "sales": return readSales();
       case "settings": return readSettings();
+      case "tables": return readTables();
+      case "tableOrders": return readTableOrders();
       default: return null;
     }
   }
@@ -489,6 +520,8 @@ function open(filePath) {
       case "extras": fillExtras(value); break;
       case "inventoryProducts": fillInventoryProducts(value); break;
       case "cashiers": fillCashiers(value); break;
+      case "tables": fillTables(value); break;
+      case "tableOrders": fillTableOrders(value); break;
       case "sales": fillSales(value); break;
       case "settings": writeSettings(value); break;
       default: throw new Error("Unknown collection: " + name);
@@ -572,6 +605,8 @@ function open(filePath) {
     // Include the PIN hashes in a backup so a restore keeps logins working
     // (bootstrap never exposes them).
     data[KEYS.cashiers] = readCashiers(true);
+    // Open tabs are transient (like the cart); tables config is kept.
+    delete data[KEYS.tableOrders];
     return {
       backupFormat: BACKUP_FORMAT_NAME,
       backupFormatVersion: BACKUP_FORMAT_VERSION,
@@ -616,6 +651,9 @@ function open(filePath) {
         fillInventoryProducts(backup.data[KEYS.inventoryProducts]);
         fillSales(backup.data[KEYS.sales]);
         writeSettings(backup.data[KEYS.settings]);
+        // Tables (optional in older backups); clear any open tabs.
+        fillTables(Array.isArray(backup.data[KEYS.tables]) ? backup.data[KEYS.tables] : []);
+        fillTableOrders([]);
         return true;
       });
       return { ok: true };

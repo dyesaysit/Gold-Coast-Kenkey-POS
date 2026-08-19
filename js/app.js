@@ -73,6 +73,9 @@
     elements.setupCurrencySymbol = document.getElementById("setup-currency-symbol");
     elements.setupPhone = document.getElementById("setup-phone");
     elements.setupAddress = document.getElementById("setup-address");
+    elements.setupServiceMode = document.getElementById("setup-service-mode");
+    elements.setupTablesField = document.getElementById("setup-tables-field");
+    elements.setupTableCount = document.getElementById("setup-table-count");
     elements.setupLogoPreview = document.getElementById("setup-logo-preview");
     elements.setupLogoFile = document.getElementById("setup-logo-file");
     elements.setupLogoChoose = document.getElementById("setup-logo-choose");
@@ -699,6 +702,9 @@
 
   function bindSetupEvents() {
     elements.setupSubmit.addEventListener("click", completeSetup);
+    elements.setupServiceMode.addEventListener("change", function () {
+      elements.setupTablesField.hidden = elements.setupServiceMode.value !== "dinein";
+    });
     elements.setupLogoChoose.addEventListener("click", function () { elements.setupLogoFile.click(); });
     elements.setupLogoRemove.addEventListener("click", function () { setSetupLogo(""); });
     elements.setupLogoFile.addEventListener("change", function (event) {
@@ -780,8 +786,10 @@
       receiptExtraInfo: "",
       receiptPaperWidth: "80mm",
       dataVersion: 2,
-      setupComplete: true
+      setupComplete: true,
+      serviceMode: elements.setupServiceMode.value === "dinein" ? "dinein" : "takeaway"
     };
+    var tables = settings.serviceMode === "dinein" ? buildTables(elements.setupTableCount.value) : [];
 
     var admin = { id: createId("user"), name: "Admin", pin: pin, role: "admin", active: true };
 
@@ -790,7 +798,7 @@
     if (global.GCK.data && global.GCK.data.isServerMode()) {
       var sample = buildSampleCatalogue();
       elements.setupSubmit.disabled = true;
-      global.GCK.data.setup({ settings: settings, admin: admin, categories: sample.categories, products: sample.products })
+      global.GCK.data.setup({ settings: settings, admin: admin, categories: sample.categories, products: sample.products, tables: tables })
         .then(function (res) {
           elements.setupSubmit.disabled = false;
           if (!res.ok) { setSetupError(res.message || "Setup could not be saved. Please try again."); return; }
@@ -804,9 +812,20 @@
     storage.saveSettings(settings);
     storage.saveCashiers([admin]);
     seedSampleCatalogue();
+    storage.saveTables(tables);
     storage.clearCurrentCart();
     auth.login(pin);
     finishSetup(settings, auth.getCurrentUser(), name);
+  }
+
+  // Build "Table 1..N" for a dine-in setup (clamped to a sane range).
+  function buildTables(count) {
+    var n = Math.max(1, Math.min(200, parseInt(count, 10) || 1));
+    var tables = [];
+    for (var i = 1; i <= n; i++) {
+      tables.push({ id: createId("table"), name: "Table " + i, active: true });
+    }
+    return tables;
   }
 
   // Shared tail of setup: load the new data, apply currency/branding, sign in.

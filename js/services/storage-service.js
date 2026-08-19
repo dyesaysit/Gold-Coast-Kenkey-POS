@@ -19,6 +19,8 @@
     sales: "gckpos.sales",
     cashiers: "gckpos.cashiers",
     settings: "gckpos.settings",
+    tables: "gckpos.tables",
+    tableOrders: "gckpos.tableOrders",
     currentCart: "gckpos.currentCart",
     session: "gckpos.session"
   };
@@ -46,7 +48,8 @@
     KEYS.inventoryProducts,
     KEYS.sales,
     KEYS.cashiers,
-    KEYS.settings
+    KEYS.settings,
+    KEYS.tables
   ];
 
   /**
@@ -163,6 +166,17 @@
 
   function getSettings() { return readJson(KEYS.settings, null); }
   function saveSettings(settings) { return writeJson(KEYS.settings, settings); }
+
+  // --- Dine-in tables (config) and open table tabs (running bills) ---------
+  // tables: [{ id, name, active }]. tableOrders: open tabs only, one per seated
+  // table: [{ tableId, tableName, items, openedAt, openedBy }]; a table with no
+  // entry is free. tableOrders are transient (not backed up), like the cart.
+
+  function getTables() { return readJson(KEYS.tables, []); }
+  function saveTables(tables) { return writeJson(KEYS.tables, tables); }
+
+  function getTableOrders() { return readJson(KEYS.tableOrders, []); }
+  function saveTableOrders(orders) { return writeJson(KEYS.tableOrders, orders); }
 
   // --- Sales history (kept separate from current product data) -------------
 
@@ -416,10 +430,13 @@
 
     try {
       applyProductContract(data[KEYS.inventoryProducts], data[KEYS.menuItems]);
+      // Older backups predate tables; default to an empty list so restore is safe.
+      if (!Array.isArray(data[KEYS.tables])) { data[KEYS.tables] = []; }
       for (i = 0; i < BACKUP_KEYS.length; i++) {
         localStorage.setItem(BACKUP_KEYS[i], JSON.stringify(data[BACKUP_KEYS[i]]));
       }
       localStorage.setItem(KEYS.currentCart, "[]");
+      localStorage.setItem(KEYS.tableOrders, "[]"); // open tabs do not survive a restore
       localStorage.removeItem(KEYS.session);
       return { ok: true };
     } catch (error) {
@@ -453,6 +470,8 @@
       saveInventoryProducts(seed.inventoryProducts);
     }
     if (localStorage.getItem(KEYS.currentCart) === null) { clearCurrentCart(); }
+    if (localStorage.getItem(KEYS.tables) === null) { saveTables([]); }
+    if (localStorage.getItem(KEYS.tableOrders) === null) { saveTableOrders([]); }
     migrateProductContract();
   }
 
@@ -478,6 +497,10 @@
     saveCashier: saveCashier,
     getSettings: getSettings,
     saveSettings: saveSettings,
+    getTables: getTables,
+    saveTables: saveTables,
+    getTableOrders: getTableOrders,
+    saveTableOrders: saveTableOrders,
     getSales: getSales,
     saveSale: saveSale,
     generateReceiptNumber: generateReceiptNumber,

@@ -55,6 +55,18 @@
           <span class="field__label">Address (optional)</span>
           <input class="field__input" id="setup-address" type="text" autocomplete="off" />
         </label>
+        <label class="field">
+          <span class="field__label">Service type</span>
+          <select class="field__input" id="setup-service-mode">
+            <option value="takeaway">Takeaway / counter (no tables)</option>
+            <option value="dinein">Dine-in (tables &amp; running tabs)</option>
+          </select>
+          <span class="field__note">Dine-in adds tables you can open a running bill on. You can change this later in Settings.</span>
+        </label>
+        <label class="field" id="setup-tables-field" hidden>
+          <span class="field__label">Number of tables</span>
+          <input class="field__input" id="setup-table-count" type="number" inputmode="numeric" min="1" max="200" value="8" />
+        </label>
         <div class="field">
           <span class="field__label">Logo (optional)</span>
           <div class="image-picker">

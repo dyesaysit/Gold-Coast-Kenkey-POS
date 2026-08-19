@@ -50,7 +50,9 @@
     { fn: "saveProteins", name: "proteins" },
     { fn: "saveExtras", name: "extras" },
     { fn: "saveInventoryProducts", name: "inventoryProducts" },
-    { fn: "saveCashiers", name: "cashiers" }
+    { fn: "saveCashiers", name: "cashiers" },
+    { fn: "saveTables", name: "tables" },
+    { fn: "saveTableOrders", name: "tableOrders" }
   ];
 
   function isServerMode() { return serverMode; }
