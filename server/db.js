@@ -142,7 +142,7 @@ var SCHEMA = [
     "cashier_id TEXT REFERENCES cashiers(id), cashier_name TEXT, " +
     "subtotal REAL, discount REAL, total REAL, " +
     "payment_method TEXT, payment_amount_paid REAL, payment_change REAL, payment_reference TEXT, " +
-    "status TEXT, receipt_settings TEXT)",
+    "status TEXT, receipt_settings TEXT, table_id TEXT REFERENCES tables(id), table_name TEXT)",
 
   "CREATE TABLE IF NOT EXISTS sale_items (" +
     "seq INTEGER PRIMARY KEY AUTOINCREMENT, sale_id TEXT REFERENCES sales(id), " +
@@ -202,6 +202,13 @@ function open(filePath) {
   }
 
   SCHEMA.forEach(function (sql) { db.exec(sql); });
+
+  // Additive migration: older sales tables lack the dine-in table columns.
+  var salesCols = db.prepare("PRAGMA table_info(sales)").all().map(function (c) { return c.name; });
+  if (salesCols.indexOf("table_id") === -1) {
+    db.exec("ALTER TABLE sales ADD COLUMN table_id TEXT");
+    db.exec("ALTER TABLE sales ADD COLUMN table_name TEXT");
+  }
 
   function transaction(work) {
     db.exec("BEGIN");
@@ -343,6 +350,7 @@ function open(filePath) {
     }
     if (r.receipt_settings !== null) { sale.receiptSettings = JSON.parse(r.receipt_settings); }
     if (r.status !== null) { sale.status = r.status; }
+    if (r.table_id !== null || r.table_name !== null) { sale.table = { id: r.table_id, name: r.table_name }; }
     return sale;
   }
 
@@ -435,7 +443,8 @@ function open(filePath) {
   function insertSaleRow(sale) {
     var cashier = sale.cashier || null;
     var payment = sale.payment || null;
-    db.prepare("INSERT INTO sales (id, receipt_number, created_at, cashier_id, cashier_name, subtotal, discount, total, payment_method, payment_amount_paid, payment_change, payment_reference, status, receipt_settings) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    var table = sale.table || null;
+    db.prepare("INSERT INTO sales (id, receipt_number, created_at, cashier_id, cashier_name, subtotal, discount, total, payment_method, payment_amount_paid, payment_change, payment_reference, status, receipt_settings, table_id, table_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
       .run(
         orNull(sale.id), orNull(sale.receiptNumber), orNull(sale.createdAt),
         cashier ? orNull(cashier.id) : null, cashier ? orNull(cashier.name) : null,
@@ -443,7 +452,8 @@ function open(filePath) {
         payment ? orNull(payment.method) : null, payment ? orNull(payment.amountPaid) : null,
         payment ? orNull(payment.change) : null, payment ? optField(payment, "reference") : null,
         optField(sale, "status"),
-        has(sale, "receiptSettings") && sale.receiptSettings ? JSON.stringify(sale.receiptSettings) : null
+        has(sale, "receiptSettings") && sale.receiptSettings ? JSON.stringify(sale.receiptSettings) : null,
+        table ? orNull(table.id) : null, table ? orNull(table.name) : null
       );
     var insItem = db.prepare("INSERT INTO sale_items (sale_id, product_id, product_name, item_type, quantity, unit_price, line_total, track_inventory, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     (sale.items || []).forEach(function (item) {

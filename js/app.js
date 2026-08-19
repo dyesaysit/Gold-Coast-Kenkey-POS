@@ -41,7 +41,11 @@
     inventoryProducts: [],
     extras: [],
     cart: [],
-    activeCategoryId: "all"
+    activeCategoryId: "all",
+    serviceMode: "takeaway", // "takeaway" or "dinein"
+    tables: [],              // dine-in: [{ id, name, active }]
+    tableOrders: [],         // dine-in: open tabs [{ tableId, tableName, items, ... }]
+    activeTableId: null      // dine-in: the table whose tab is loaded into the cart
   };
 
   var currentUser = null; // session snapshot { id, name, role } or null
@@ -109,6 +113,11 @@
     elements.cartCount = document.getElementById("cart-count");
     elements.checkoutButton = document.getElementById("checkout-button");
     elements.cart = document.getElementById("cart");
+    elements.tablesView = document.getElementById("tables-view");
+    elements.tablesGrid = document.getElementById("tables-grid");
+    elements.cartTableBanner = document.getElementById("cart-table-banner");
+    elements.cartTableName = document.getElementById("cart-table-name");
+    elements.cartTableBack = document.getElementById("cart-table-back");
     elements.posCta = document.getElementById("pos-cta");
     elements.posCtaCount = document.getElementById("pos-cta-count");
     elements.posCtaTotal = document.getElementById("pos-cta-total");
@@ -373,9 +382,63 @@
     state.inventoryProducts = storage.getInventoryProducts();
     state.extras = storage.getExtras();
     state.cart = storage.getCurrentCart();
+    state.serviceMode = (state.settings && state.settings.serviceMode === "dinein") ? "dinein" : "takeaway";
+    state.tables = storage.getTables();
+    state.tableOrders = storage.getTableOrders();
 
     if (state.settings && state.settings.currencySymbol) {
       money.setCurrencySymbol(state.settings.currencySymbol);
+    }
+  }
+
+  // --- Dine-in helpers -----------------------------------------------------
+
+  function isDineIn() { return state.serviceMode === "dinein"; }
+
+  function findTableOrder(tableId) {
+    for (var i = 0; i < state.tableOrders.length; i++) {
+      if (state.tableOrders[i].tableId === tableId) { return state.tableOrders[i]; }
+    }
+    return null;
+  }
+
+  function tableName(tableId) {
+    for (var i = 0; i < state.tables.length; i++) {
+      if (state.tables[i].id === tableId) { return state.tables[i].name; }
+    }
+    return "Table";
+  }
+
+  function cartTotalOf(items) {
+    return (items || []).reduce(function (sum, item) { return sum + Number(item.lineTotal || 0); }, 0);
+  }
+
+  /**
+   * Persist the current cart. In dine-in with an open table it is the table's
+   * running tab (mirrored across devices); otherwise the per-device cart.
+   */
+  function persistCart() {
+    if (isDineIn() && state.activeTableId) {
+      var order = findTableOrder(state.activeTableId);
+      if (validation.isCartEmpty(state.cart)) {
+        // An emptied tab is removed so the table shows as free again.
+        state.tableOrders = state.tableOrders.filter(function (o) { return o.tableId !== state.activeTableId; });
+      } else if (order) {
+        order.items = state.cart;
+        order.updatedAt = new Date().toISOString();
+      } else {
+        state.tableOrders.push({
+          tableId: state.activeTableId,
+          tableName: tableName(state.activeTableId),
+          items: state.cart,
+          openedAt: new Date().toISOString(),
+          openedBy: currentUser ? currentUser.name : "",
+          updatedAt: new Date().toISOString()
+        });
+      }
+      storage.saveTableOrders(state.tableOrders);
+    } else {
+      storage.saveCurrentCart(state.cart);
     }
   }
 
@@ -629,10 +692,18 @@
     }
   }
 
-  /** The section a role lands on: its first accessible nav item. */
+  /** The section a role lands on: its first accessible, mode-appropriate nav item. */
   function defaultNavKeyFor(user) {
+    var keys = navKeysFor(user);
+    return keys.length ? keys[0] : "pos";
+  }
+
+  // Nav keys a user can see, hiding "tables" unless the business is dine-in.
+  function navKeysFor(user) {
     var nav = user ? auth.getAccessibleNav(user.role) : [];
-    return nav.length ? nav[0].key : "pos";
+    return nav.map(function (item) { return item.key; }).filter(function (key) {
+      return key !== "tables" || isDineIn();
+    });
   }
 
   /**
@@ -642,21 +713,30 @@
   function showSection(key) {
     if (!currentUser || !auth.canAccess(currentUser.role, key)) {
       showToast("You do not have access to that section.");
-      key = "pos";
+      key = isDineIn() ? "tables" : "pos";
+    }
+    // Dine-in: you cannot open the POS grid without a table selected — it always
+    // belongs to a table's tab. Send them to pick a table first.
+    if (key === "pos" && isDineIn() && !state.activeTableId) {
+      key = "tables";
     }
     activeNavKey = key;
     var isPos = (key === "pos");
+    var isTables = (key === "tables");
     var isManage = (key === "products" || key === "inventory");
     // The desktop cart sidebar's width is only reserved on the POS screen.
     elements.posView.setAttribute("data-cart", isPos ? "on" : "off");
     elements.categoryBar.hidden = !isPos;
     elements.appMain.hidden = !isPos;
+    elements.tablesView.hidden = !isTables;
     elements.manageView.hidden = !isManage;
     elements.usersView.hidden = key !== "users";
     elements.settingsView.hidden = key !== "settings";
     elements.reportsView.hidden = key !== "reports";
     elements.salesHistoryView.hidden = key !== "sales-history";
-    if (isManage) {
+    if (isTables) {
+      renderTables();
+    } else if (isManage) {
       renderManageScreen(key);
     } else if (key === "users") {
       renderUsers();
@@ -668,6 +748,57 @@
       renderSalesHistory();
     }
     renderNav();
+  }
+
+  // --- Dine-in: tables screen ---------------------------------------------
+
+  function renderTables() {
+    state.tables = storage.getTables();
+    state.tableOrders = storage.getTableOrders();
+    elements.tablesGrid.innerHTML = "";
+    var active = state.tables.filter(function (t) { return t.active !== false; });
+    if (active.length === 0) {
+      var empty = document.createElement("p");
+      empty.className = "tables-view__empty";
+      empty.textContent = "No tables yet. An admin can add tables in Settings.";
+      elements.tablesGrid.appendChild(empty);
+      return;
+    }
+    active.forEach(function (table) {
+      var order = findTableOrder(table.id);
+      var occupied = !!order;
+      var card = document.createElement("button");
+      card.type = "button";
+      card.className = "table-card" + (occupied ? " table-card--open" : "");
+      var name = document.createElement("span");
+      name.className = "table-card__name";
+      name.textContent = table.name;
+      var status = document.createElement("span");
+      status.className = "table-card__status";
+      status.textContent = occupied ? money.formatMoney(cartTotalOf(order.items)) : "Free";
+      card.appendChild(name);
+      card.appendChild(status);
+      card.addEventListener("click", function () { openTable(table.id); });
+      elements.tablesGrid.appendChild(card);
+    });
+  }
+
+  function openTable(tableId) {
+    state.activeTableId = tableId;
+    var order = findTableOrder(tableId);
+    state.cart = order ? JSON.parse(JSON.stringify(order.items)) : [];
+    showSection("pos");
+    renderProducts();
+    renderCart();
+    showToast("Opened " + tableName(tableId) + ".");
+  }
+
+  // Leave the table without settling; its tab stays open on the server.
+  function backToTables() {
+    state.activeTableId = null;
+    state.cart = [];
+    renderCart();
+    showSection("tables");
   }
 
   function showLogin() {
@@ -894,7 +1025,10 @@
     if (!currentUser) {
       return;
     }
-    var items = auth.getAccessibleNav(currentUser.role);
+    var allowed = navKeysFor(currentUser); // hides "tables" in takeaway mode
+    var items = auth.getAccessibleNav(currentUser.role).filter(function (item) {
+      return allowed.indexOf(item.key) !== -1;
+    });
     for (var i = 0; i < items.length; i++) {
       elements.appNav.appendChild(buildNavItem(items[i]));
     }
@@ -1598,10 +1732,11 @@
 
   function bindPosEvents() {
     elements.productSearch.addEventListener("input", renderProducts);
+    elements.cartTableBack.addEventListener("click", backToTables);
   }
 
   function persistAndRenderCart(highlightItemId) {
-    storage.saveCurrentCart(state.cart);
+    persistCart();
     renderCart(highlightItemId);
   }
 
@@ -1635,6 +1770,14 @@
     elements.cartSubtotal.textContent = money.formatMoney(subtotal);
     elements.cartTotal.textContent = money.formatMoney(total);
     elements.checkoutButton.disabled = empty; // no checkout with an empty cart
+
+    // Dine-in: show which table this bill is for, and relabel the pay button.
+    var dineTable = isDineIn() && state.activeTableId;
+    if (elements.cartTableBanner) {
+      elements.cartTableBanner.hidden = !dineTable;
+      if (dineTable) { elements.cartTableName.textContent = tableName(state.activeTableId); }
+    }
+    elements.checkoutButton.textContent = dineTable ? "Settle bill" : "Checkout";
 
     // Mirror the total onto the mobile sticky checkout bar, and hide it while
     // the cart is empty (CSS keeps it hidden on desktop regardless).
@@ -3524,6 +3667,10 @@
       receiptSettings: storage.createReceiptSettingsSnapshot(state.settings),
       status: "completed"
     };
+    // Dine-in: tag the sale with its table so the receipt/history show it.
+    if (isDineIn() && state.activeTableId) {
+      sale.table = { id: state.activeTableId, name: tableName(state.activeTableId) };
+    }
 
     // Stock is only reduced here, inside a completed sale. The gateway runs the
     // local transaction in local mode, or the atomic /api/sales call in server
@@ -3541,9 +3688,18 @@
         return;
       }
       var finalSale = completion.sale || sale;
+      var settledTable = isDineIn() && state.activeTableId;
 
-      // Refresh from storage: cart cleared, inventory stock reduced.
-      state.cart = storage.getCurrentCart();
+      // Dine-in settle: close the table's tab (remove it), free the table, and
+      // return to the tables screen. Takeaway: fall back to the per-device cart.
+      if (settledTable) {
+        state.tableOrders = storage.getTableOrders().filter(function (o) { return o.tableId !== state.activeTableId; });
+        storage.saveTableOrders(state.tableOrders);
+        state.activeTableId = null;
+        state.cart = [];
+      } else {
+        state.cart = storage.getCurrentCart();
+      }
       state.inventoryProducts = storage.getInventoryProducts();
       renderProducts();
       renderCart();
@@ -3551,6 +3707,7 @@
       closeCheckout();
       showReceipt(finalSale);
       showToast("Sale completed. Receipt " + finalSale.receiptNumber + ".");
+      if (settledTable) { showSection("tables"); }
     });
   }
 

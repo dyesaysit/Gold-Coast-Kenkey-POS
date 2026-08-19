@@ -20,6 +20,7 @@
   // The full set of navigation sections the app knows about. Order here is the
   // display order and also decides each role's landing section (first allowed).
   var NAV_ITEMS = [
+    { key: "tables", label: "Tables" },
     { key: "pos", label: "POS" },
     { key: "products", label: "Products" },
     { key: "inventory", label: "Inventory" },
@@ -35,9 +36,11 @@
   //   - admin:      every section, including Users and Settings.
   // Landing section is the first accessible item in NAV_ITEMS order, so keeping
   // "pos" first means the supervisor lands on POS after login.
+  // "tables" is accessible to every role (dine-in), but only shown when the
+  // business runs in dine-in mode (the app filters it by serviceMode).
   var ROLE_ACCESS = {
-    cashier: ["pos"],
-    supervisor: ["pos", "products", "inventory", "sales-history", "reports"],
+    cashier: ["tables", "pos"],
+    supervisor: ["tables", "pos", "products", "inventory", "sales-history", "reports"],
     admin: NAV_ITEMS.map(function (item) { return item.key; })
   };
 

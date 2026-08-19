@@ -463,6 +463,77 @@ body {
   .cart--review { animation: none; }
 }
 
+/* --- Dine-in: tables screen --------------------------------------------- */
+.tables-view {
+  padding: var(--space-md);
+  overflow-y: auto;
+}
+
+.tables-view__head {
+  margin-bottom: var(--space-md);
+}
+
+.tables-view__hint {
+  color: var(--color-text-muted);
+  font-size: var(--font-small);
+  margin-top: var(--space-xs);
+}
+
+.tables-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: var(--space-md);
+}
+
+.table-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-height: 96px;
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface-alt);
+  color: var(--color-text);
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.table-card:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(20, 83, 45, 0.12); }
+.table-card:focus-visible { outline: 3px solid var(--color-accent); outline-offset: 2px; }
+
+/* Open tables stand out in the brand green with their running total. */
+.table-card--open {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary-dark);
+  color: #fff;
+}
+
+.table-card__name { font-size: var(--font-body); font-weight: bold; }
+.table-card__status { font-size: var(--font-price); font-weight: bold; }
+.table-card:not(.table-card--open) .table-card__status { color: var(--color-text-muted); font-weight: normal; }
+
+.tables-view__empty { color: var(--color-text-muted); }
+
+/* Cart banner naming the open table (dine-in). */
+.cart-table-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-sm);
+  background-color: var(--color-primary);
+  color: #fff;
+  border-radius: var(--radius-md);
+  font-weight: bold;
+}
+.cart-table-banner[hidden] { display: none; }
+.cart-table-banner__back { padding: 4px 10px; }
+
 /* --- Cart ---------------------------------------------------------------- */
 .cart {
   background-color: var(--color-surface);
