@@ -5,6 +5,9 @@ server/data/
 node_modules/
 npm-debug.log*
 
+# Electron installer build output (electron-builder)
+dist/
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db
