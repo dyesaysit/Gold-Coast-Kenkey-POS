@@ -69,6 +69,15 @@ Notes:
 
 ## Troubleshooting
 
+- **`npm run dist` fails with "Cannot create symbolic link: A required privilege
+  is not held by the client"** — electron-builder's `winCodeSign` helper contains
+  macOS symlinks that Windows only lets privileged users extract. The app still
+  packages to `dist/win-unpacked/` (runnable directly); only the installer step
+  fails. Fix by granting the privilege, then re-run `npm run dist`:
+  - **Turn on Windows Developer Mode** (Settings → Privacy & security → For
+    developers → Developer Mode = On), **or**
+  - run the terminal **as Administrator**.
+  Once `winCodeSign` extracts once, it is cached and later builds succeed.
 - **"server did not start" / node:sqlite error** — Electron's bundled Node must
   include `node:sqlite` (Node 22.5+; Electron 43 ships Node 22). If a future
   Electron changes the flag handling, the fix is in `electron/main.js`

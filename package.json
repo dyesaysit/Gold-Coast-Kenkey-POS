@@ -2,6 +2,7 @@
   "name": "gold-coast-kenkey-pos",
   "version": "2.0.0",
   "private": true,
+  "author": "Omar Dye Ceesay",
   "description": "Gold Coast Kenkey POS. Runs client-side from index.html; the Phase 2 server (server/) adds a shared SQLite database; the Electron wrapper (electron/) packages it as a desktop app with an installer.",
   "main": "electron/main.js",
   "scripts": {
