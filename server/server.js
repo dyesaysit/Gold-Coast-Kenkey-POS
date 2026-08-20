@@ -218,6 +218,7 @@ function handleApi(req, res, urlPath) {
         store.replaceCollection("cashiers", [v.admin]);
         store.replaceCollection("categories", Array.isArray(v.categories) ? v.categories : []);
         store.replaceCollection("inventoryProducts", Array.isArray(v.products) ? v.products : []);
+        store.replaceCollection("tables", Array.isArray(v.tables) ? v.tables : []);
         var user = store.verifyLogin(String(v.admin.pin));
         if (!user) { sendJson(res, 500, { ok: false, error: "Setup failed." }); return; }
         sendJson(res, 200, { ok: true, token: issueToken(user), user: user });

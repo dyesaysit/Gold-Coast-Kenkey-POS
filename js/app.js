@@ -41,7 +41,11 @@
     inventoryProducts: [],
     extras: [],
     cart: [],
-    activeCategoryId: "all"
+    activeCategoryId: "all",
+    serviceMode: "takeaway", // "takeaway" or "dinein"
+    tables: [],              // dine-in: [{ id, name, active }]
+    tableOrders: [],         // dine-in: open tabs [{ tableId, tableName, items, ... }]
+    activeTableId: null      // dine-in: the table whose tab is loaded into the cart
   };
 
   var currentUser = null; // session snapshot { id, name, role } or null
@@ -53,6 +57,7 @@
   var IDLE_LOGOUT_MS = 15 * 60 * 1000; // auto-logout an unattended till
   var idleTimer = null;
   var loginTimer = null; // debounces server-mode login (see serverAttemptLogin)
+  var tablesRefreshTimer = null; // polls open tabs while the Tables screen is open
   var activeNavKey = "pos"; // only the POS screen exists at this stage
 
   var elements = {};
@@ -73,6 +78,9 @@
     elements.setupCurrencySymbol = document.getElementById("setup-currency-symbol");
     elements.setupPhone = document.getElementById("setup-phone");
     elements.setupAddress = document.getElementById("setup-address");
+    elements.setupServiceMode = document.getElementById("setup-service-mode");
+    elements.setupTablesField = document.getElementById("setup-tables-field");
+    elements.setupTableCount = document.getElementById("setup-table-count");
     elements.setupLogoPreview = document.getElementById("setup-logo-preview");
     elements.setupLogoFile = document.getElementById("setup-logo-file");
     elements.setupLogoChoose = document.getElementById("setup-logo-choose");
@@ -106,6 +114,11 @@
     elements.cartCount = document.getElementById("cart-count");
     elements.checkoutButton = document.getElementById("checkout-button");
     elements.cart = document.getElementById("cart");
+    elements.tablesView = document.getElementById("tables-view");
+    elements.tablesGrid = document.getElementById("tables-grid");
+    elements.cartTableBanner = document.getElementById("cart-table-banner");
+    elements.cartTableName = document.getElementById("cart-table-name");
+    elements.cartTableBack = document.getElementById("cart-table-back");
     elements.posCta = document.getElementById("pos-cta");
     elements.posCtaCount = document.getElementById("pos-cta-count");
     elements.posCtaTotal = document.getElementById("pos-cta-total");
@@ -185,6 +198,18 @@
     elements.categoryError = document.getElementById("category-error");
     elements.categoryCancel = document.getElementById("category-cancel");
     elements.categorySave = document.getElementById("category-save");
+    elements.sfDineinEnabled = document.getElementById("sf-dinein-enabled");
+    elements.sfTablesActions = document.getElementById("sf-tables-actions");
+    elements.sfTablesCount = document.getElementById("sf-tables-count");
+    elements.tablesManage = document.getElementById("tables-manage");
+    elements.tablesModal = document.getElementById("tables-modal");
+    elements.tablesOverlay = document.getElementById("tables-overlay");
+    elements.tablesClose = document.getElementById("tables-close");
+    elements.tablesEditorList = document.getElementById("tables-editor-list");
+    elements.tablesAdd = document.getElementById("tables-add");
+    elements.tablesError = document.getElementById("tables-error");
+    elements.tablesCancel = document.getElementById("tables-cancel");
+    elements.tablesSave = document.getElementById("tables-save");
     elements.manageHint = document.getElementById("manage-hint");
     elements.manageList = document.getElementById("manage-list");
     elements.inventoryPrintFormat = document.getElementById("inventory-print-format");
@@ -370,9 +395,63 @@
     state.inventoryProducts = storage.getInventoryProducts();
     state.extras = storage.getExtras();
     state.cart = storage.getCurrentCart();
+    state.serviceMode = (state.settings && state.settings.serviceMode === "dinein") ? "dinein" : "takeaway";
+    state.tables = storage.getTables();
+    state.tableOrders = storage.getTableOrders();
 
     if (state.settings && state.settings.currencySymbol) {
       money.setCurrencySymbol(state.settings.currencySymbol);
+    }
+  }
+
+  // --- Dine-in helpers -----------------------------------------------------
+
+  function isDineIn() { return state.serviceMode === "dinein"; }
+
+  function findTableOrder(tableId) {
+    for (var i = 0; i < state.tableOrders.length; i++) {
+      if (state.tableOrders[i].tableId === tableId) { return state.tableOrders[i]; }
+    }
+    return null;
+  }
+
+  function tableName(tableId) {
+    for (var i = 0; i < state.tables.length; i++) {
+      if (state.tables[i].id === tableId) { return state.tables[i].name; }
+    }
+    return "Table";
+  }
+
+  function cartTotalOf(items) {
+    return (items || []).reduce(function (sum, item) { return sum + Number(item.lineTotal || 0); }, 0);
+  }
+
+  /**
+   * Persist the current cart. In dine-in with an open table it is the table's
+   * running tab (mirrored across devices); otherwise the per-device cart.
+   */
+  function persistCart() {
+    if (isDineIn() && state.activeTableId) {
+      var order = findTableOrder(state.activeTableId);
+      if (validation.isCartEmpty(state.cart)) {
+        // An emptied tab is removed so the table shows as free again.
+        state.tableOrders = state.tableOrders.filter(function (o) { return o.tableId !== state.activeTableId; });
+      } else if (order) {
+        order.items = state.cart;
+        order.updatedAt = new Date().toISOString();
+      } else {
+        state.tableOrders.push({
+          tableId: state.activeTableId,
+          tableName: tableName(state.activeTableId),
+          items: state.cart,
+          openedAt: new Date().toISOString(),
+          openedBy: currentUser ? currentUser.name : "",
+          updatedAt: new Date().toISOString()
+        });
+      }
+      storage.saveTableOrders(state.tableOrders);
+    } else {
+      storage.saveCurrentCart(state.cart);
     }
   }
 
@@ -626,10 +705,19 @@
     }
   }
 
-  /** The section a role lands on: its first accessible nav item. */
+  /** The section a role lands on: its first accessible, mode-appropriate nav item. */
   function defaultNavKeyFor(user) {
+    var keys = navKeysFor(user);
+    return keys.length ? keys[0] : "pos";
+  }
+
+  // Nav keys a user can see. "Tables" only shows in dine-in. POS shows in both
+  // modes — in dine-in it doubles as the over-the-counter / takeaway sale.
+  function navKeysFor(user) {
     var nav = user ? auth.getAccessibleNav(user.role) : [];
-    return nav.length ? nav[0].key : "pos";
+    return nav.map(function (item) { return item.key; }).filter(function (key) {
+      return key !== "tables" || isDineIn();
+    });
   }
 
   /**
@@ -639,21 +727,33 @@
   function showSection(key) {
     if (!currentUser || !auth.canAccess(currentUser.role, key)) {
       showToast("You do not have access to that section.");
-      key = "pos";
+      key = isDineIn() ? "tables" : "pos";
     }
     activeNavKey = key;
     var isPos = (key === "pos");
+    var isTables = (key === "tables");
     var isManage = (key === "products" || key === "inventory");
     // The desktop cart sidebar's width is only reserved on the POS screen.
     elements.posView.setAttribute("data-cart", isPos ? "on" : "off");
     elements.categoryBar.hidden = !isPos;
     elements.appMain.hidden = !isPos;
+    elements.tablesView.hidden = !isTables;
     elements.manageView.hidden = !isManage;
     elements.usersView.hidden = key !== "users";
     elements.settingsView.hidden = key !== "settings";
     elements.reportsView.hidden = key !== "reports";
     elements.salesHistoryView.hidden = key !== "sales-history";
-    if (isManage) {
+    // Live-refresh the Tables screen (server mode) so other devices' open tabs
+    // appear within a few seconds; stop polling when leaving it.
+    if (isTables && global.GCK.data && global.GCK.data.isServerMode()) {
+      startTablesPoll();
+    } else {
+      stopTablesPoll();
+    }
+
+    if (isTables) {
+      renderTables();
+    } else if (isManage) {
       renderManageScreen(key);
     } else if (key === "users") {
       renderUsers();
@@ -665,6 +765,82 @@
       renderSalesHistory();
     }
     renderNav();
+  }
+
+  // --- Dine-in: tables screen ---------------------------------------------
+
+  function renderTables() {
+    state.tables = storage.getTables();
+    state.tableOrders = storage.getTableOrders();
+    elements.tablesGrid.innerHTML = "";
+    var active = state.tables.filter(function (t) { return t.active !== false; });
+    if (active.length === 0) {
+      var empty = document.createElement("p");
+      empty.className = "tables-view__empty";
+      empty.textContent = "No tables yet. An admin can add tables in Settings.";
+      elements.tablesGrid.appendChild(empty);
+      return;
+    }
+    active.forEach(function (table) {
+      var order = findTableOrder(table.id);
+      var occupied = !!order;
+      var card = document.createElement("button");
+      card.type = "button";
+      card.className = "table-card" + (occupied ? " table-card--open" : "");
+      // The inner "top" is the table surface; CSS draws chairs around it.
+      var top = document.createElement("span");
+      top.className = "table-card__top";
+      var name = document.createElement("span");
+      name.className = "table-card__name";
+      name.textContent = table.name;
+      var status = document.createElement("span");
+      status.className = "table-card__status";
+      status.textContent = occupied ? money.formatMoney(cartTotalOf(order.items)) : "Free";
+      top.appendChild(name);
+      top.appendChild(status);
+      card.appendChild(top);
+      card.addEventListener("click", function () { openTable(table.id); });
+      elements.tablesGrid.appendChild(card);
+    });
+  }
+
+  function openTable(tableId) {
+    state.activeTableId = tableId;
+    var order = findTableOrder(tableId);
+    state.cart = order ? JSON.parse(JSON.stringify(order.items)) : [];
+    showSection("pos");
+    renderProducts();
+    renderCart();
+    showToast("Opened " + tableName(tableId) + ".");
+  }
+
+  // Leave the table without settling; its tab stays open on the server.
+  function backToTables() {
+    state.activeTableId = null;
+    state.cart = [];
+    renderCart();
+    showSection("tables");
+  }
+
+  // POS as an over-the-counter / takeaway sale: no table, the per-device cart.
+  function openCounterSale() {
+    state.activeTableId = null;
+    state.cart = storage.getCurrentCart();
+    showSection("pos");
+    renderProducts();
+    renderCart();
+  }
+
+  function startTablesPoll() {
+    if (tablesRefreshTimer) { return; }
+    tablesRefreshTimer = global.setInterval(function () {
+      global.GCK.data.refresh().then(function () {
+        if (activeNavKey === "tables") { renderTables(); }
+      });
+    }, 5000);
+  }
+  function stopTablesPoll() {
+    if (tablesRefreshTimer) { global.clearInterval(tablesRefreshTimer); tablesRefreshTimer = null; }
   }
 
   function showLogin() {
@@ -699,6 +875,9 @@
 
   function bindSetupEvents() {
     elements.setupSubmit.addEventListener("click", completeSetup);
+    elements.setupServiceMode.addEventListener("change", function () {
+      elements.setupTablesField.hidden = elements.setupServiceMode.value !== "dinein";
+    });
     elements.setupLogoChoose.addEventListener("click", function () { elements.setupLogoFile.click(); });
     elements.setupLogoRemove.addEventListener("click", function () { setSetupLogo(""); });
     elements.setupLogoFile.addEventListener("change", function (event) {
@@ -780,8 +959,10 @@
       receiptExtraInfo: "",
       receiptPaperWidth: "80mm",
       dataVersion: 2,
-      setupComplete: true
+      setupComplete: true,
+      serviceMode: elements.setupServiceMode.value === "dinein" ? "dinein" : "takeaway"
     };
+    var tables = settings.serviceMode === "dinein" ? buildTables(elements.setupTableCount.value) : [];
 
     var admin = { id: createId("user"), name: "Admin", pin: pin, role: "admin", active: true };
 
@@ -790,7 +971,7 @@
     if (global.GCK.data && global.GCK.data.isServerMode()) {
       var sample = buildSampleCatalogue();
       elements.setupSubmit.disabled = true;
-      global.GCK.data.setup({ settings: settings, admin: admin, categories: sample.categories, products: sample.products })
+      global.GCK.data.setup({ settings: settings, admin: admin, categories: sample.categories, products: sample.products, tables: tables })
         .then(function (res) {
           elements.setupSubmit.disabled = false;
           if (!res.ok) { setSetupError(res.message || "Setup could not be saved. Please try again."); return; }
@@ -804,9 +985,20 @@
     storage.saveSettings(settings);
     storage.saveCashiers([admin]);
     seedSampleCatalogue();
+    storage.saveTables(tables);
     storage.clearCurrentCart();
     auth.login(pin);
     finishSetup(settings, auth.getCurrentUser(), name);
+  }
+
+  // Build "Table 1..N" for a dine-in setup (clamped to a sane range).
+  function buildTables(count) {
+    var n = Math.max(1, Math.min(200, parseInt(count, 10) || 1));
+    var tables = [];
+    for (var i = 1; i <= n; i++) {
+      tables.push({ id: createId("table"), name: "Table " + i, active: true });
+    }
+    return tables;
   }
 
   // Shared tail of setup: load the new data, apply currency/branding, sign in.
@@ -875,7 +1067,10 @@
     if (!currentUser) {
       return;
     }
-    var items = auth.getAccessibleNav(currentUser.role);
+    var allowed = navKeysFor(currentUser); // hides "tables" in takeaway mode
+    var items = auth.getAccessibleNav(currentUser.role).filter(function (item) {
+      return allowed.indexOf(item.key) !== -1;
+    });
     for (var i = 0; i < items.length; i++) {
       elements.appNav.appendChild(buildNavItem(items[i]));
     }
@@ -896,8 +1091,12 @@
   }
 
   function handleNavClick(item) {
+    if (item.key === "tables") {
+      backToTables(); // show the tables list (clears any open table)
+      return;
+    }
     if (item.key === "pos") {
-      showSection("pos");
+      openCounterSale(); // POS = over-the-counter/takeaway sale (no table)
       return;
     }
     if (item.key === "products" || item.key === "inventory" || item.key === "users" || item.key === "settings" || item.key === "reports" || item.key === "sales-history") {
@@ -1579,10 +1778,11 @@
 
   function bindPosEvents() {
     elements.productSearch.addEventListener("input", renderProducts);
+    elements.cartTableBack.addEventListener("click", backToTables);
   }
 
   function persistAndRenderCart(highlightItemId) {
-    storage.saveCurrentCart(state.cart);
+    persistCart();
     renderCart(highlightItemId);
   }
 
@@ -1616,6 +1816,14 @@
     elements.cartSubtotal.textContent = money.formatMoney(subtotal);
     elements.cartTotal.textContent = money.formatMoney(total);
     elements.checkoutButton.disabled = empty; // no checkout with an empty cart
+
+    // Dine-in: show which table this bill is for, and relabel the pay button.
+    var dineTable = isDineIn() && state.activeTableId;
+    if (elements.cartTableBanner) {
+      elements.cartTableBanner.hidden = !dineTable;
+      if (dineTable) { elements.cartTableName.textContent = tableName(state.activeTableId); }
+    }
+    elements.checkoutButton.textContent = dineTable ? "Settle bill" : "Checkout";
 
     // Mirror the total onto the mobile sticky checkout bar, and hide it while
     // the cart is empty (CSS keeps it hidden on desktop regardless).
@@ -1799,6 +2007,20 @@
     elements.categoryCancel.addEventListener("click", closeCategoryEditor);
     elements.categoryClose.addEventListener("click", closeCategoryEditor);
     elements.categoryOverlay.addEventListener("click", closeCategoryEditor);
+
+    // Dine-in tables (settings + editor)
+    elements.sfDineinEnabled.addEventListener("change", toggleDineIn);
+    elements.tablesManage.addEventListener("click", openTablesEditor);
+    elements.tablesAdd.addEventListener("click", function () {
+      elements.tablesEditorList.appendChild(buildTableEditRow(null));
+    });
+    elements.tablesSave.addEventListener("click", saveTablesEditor);
+    elements.tablesCancel.addEventListener("click", closeTablesEditor);
+    elements.tablesClose.addEventListener("click", closeTablesEditor);
+    elements.tablesOverlay.addEventListener("click", closeTablesEditor);
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !elements.tablesModal.hidden) { closeTablesEditor(); }
+    });
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && !elements.categoryModal.hidden) {
         closeCategoryEditor();
@@ -1920,6 +2142,95 @@
     reloadCatalogue();             // refresh chips + product-form dropdown
     closeCategoryEditor();
     showToast("Categories saved.");
+  }
+
+  // --- Dine-in tables: settings toggle + editor (admin) --------------------
+
+  function refreshTablesSettings() {
+    var enabled = isDineIn();
+    if (elements.sfDineinEnabled) { elements.sfDineinEnabled.checked = enabled; }
+    if (elements.sfTablesActions) { elements.sfTablesActions.hidden = !enabled; }
+    if (elements.sfTablesCount) {
+      var n = storage.getTables().filter(function (t) { return t.active !== false; }).length;
+      elements.sfTablesCount.textContent = n + (n === 1 ? " table" : " tables");
+    }
+  }
+
+  function toggleDineIn() {
+    if (!isAdmin()) { elements.sfDineinEnabled.checked = isDineIn(); showToast("Admin access is required."); return; }
+    var settings = storage.getSettings() || {};
+    settings.serviceMode = elements.sfDineinEnabled.checked ? "dinein" : "takeaway";
+    storage.saveSettings(settings);
+    state.settings = settings;
+    state.serviceMode = settings.serviceMode;
+    refreshTablesSettings();
+    renderNav();
+    showToast(isDineIn() ? "Dine-in enabled." : "Dine-in turned off.");
+  }
+
+  function openTablesEditor() {
+    if (!isAdmin()) { showToast("Admin access is required."); return; }
+    setTablesError("");
+    renderTablesEditor(storage.getTables());
+    elements.tablesModal.hidden = false;
+  }
+  function closeTablesEditor() { elements.tablesModal.hidden = true; }
+  function setTablesError(message) { elements.tablesError.textContent = message; }
+
+  function renderTablesEditor(tables) {
+    elements.tablesEditorList.innerHTML = "";
+    tables.forEach(function (t) { elements.tablesEditorList.appendChild(buildTableEditRow(t)); });
+    if (tables.length === 0) { elements.tablesEditorList.appendChild(buildTableEditRow(null)); }
+  }
+
+  function buildTableEditRow(table) {
+    var row = document.createElement("div");
+    row.className = "cat-edit-row";
+    if (table && table.id) { row.setAttribute("data-table-id", table.id); }
+    var name = document.createElement("input");
+    name.className = "field__input cat-edit-row__name";
+    name.type = "text";
+    name.placeholder = "Table name";
+    name.value = table ? (table.name || "") : "";
+    var remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "btn btn--danger cat-edit-row__remove";
+    remove.textContent = "Remove";
+    remove.addEventListener("click", function () {
+      var id = row.getAttribute("data-table-id");
+      if (id && findTableOrder(id)) {
+        setTablesError("\"" + (name.value || "That table") + "\" has an open bill — settle it first.");
+        return;
+      }
+      row.remove();
+    });
+    row.appendChild(name);
+    row.appendChild(remove);
+    return row;
+  }
+
+  function saveTablesEditor() {
+    if (!isAdmin()) { showToast("Admin access is required."); return; }
+    var rows = elements.tablesEditorList.querySelectorAll(".cat-edit-row");
+    var tables = [];
+    var seen = {};
+    for (var i = 0; i < rows.length; i++) {
+      var nm = rows[i].querySelector(".cat-edit-row__name").value.trim();
+      if (!nm) { setTablesError("Every table needs a name (row " + (i + 1) + ")."); return; }
+      var key = nm.toLowerCase();
+      if (seen[key]) { setTablesError("Duplicate table name: \"" + nm + "\"."); return; }
+      seen[key] = true;
+      tables.push({
+        id: rows[i].getAttribute("data-table-id") || createId("table"),
+        name: nm,
+        active: true
+      });
+    }
+    storage.saveTables(tables);
+    state.tables = tables;
+    closeTablesEditor();
+    refreshTablesSettings();
+    showToast("Tables saved.");
   }
 
   function renderInventoryReport() {
@@ -3001,6 +3312,7 @@
     elements.settingsError.textContent = "";
     resetBackupSelection();
     setSettingsLogo(settings.logo || "");
+    refreshTablesSettings();
   }
 
   function resetBackupSelection() {
@@ -3164,7 +3476,10 @@
       receiptFooterNote: elements.sfReceiptFooter.value.trim(),
       receiptExtraInfo: elements.sfReceiptExtraInfo.value.trim(),
       receiptPaperWidth: elements.sfReceiptPaper.value === "58mm" ? "58mm" : "80mm",
-      dataVersion: oldSettings.dataVersion || 2
+      dataVersion: oldSettings.dataVersion || 2,
+      // Preserve flags managed elsewhere (the dine-in toggle, first-run marker).
+      serviceMode: oldSettings.serviceMode === "dinein" ? "dinein" : "takeaway",
+      setupComplete: oldSettings.setupComplete
     };
     if (!storage.saveSettings(settings)) { elements.settingsError.textContent = "Could not save settings."; return; }
     state.settings = settings;
@@ -3505,6 +3820,10 @@
       receiptSettings: storage.createReceiptSettingsSnapshot(state.settings),
       status: "completed"
     };
+    // Dine-in: tag the sale with its table so the receipt/history show it.
+    if (isDineIn() && state.activeTableId) {
+      sale.table = { id: state.activeTableId, name: tableName(state.activeTableId) };
+    }
 
     // Stock is only reduced here, inside a completed sale. The gateway runs the
     // local transaction in local mode, or the atomic /api/sales call in server
@@ -3522,9 +3841,18 @@
         return;
       }
       var finalSale = completion.sale || sale;
+      var settledTable = isDineIn() && state.activeTableId;
 
-      // Refresh from storage: cart cleared, inventory stock reduced.
-      state.cart = storage.getCurrentCart();
+      // Dine-in settle: close the table's tab (remove it), free the table, and
+      // return to the tables screen. Takeaway: fall back to the per-device cart.
+      if (settledTable) {
+        state.tableOrders = storage.getTableOrders().filter(function (o) { return o.tableId !== state.activeTableId; });
+        storage.saveTableOrders(state.tableOrders);
+        state.activeTableId = null;
+        state.cart = [];
+      } else {
+        state.cart = storage.getCurrentCart();
+      }
       state.inventoryProducts = storage.getInventoryProducts();
       renderProducts();
       renderCart();
@@ -3532,6 +3860,7 @@
       closeCheckout();
       showReceipt(finalSale);
       showToast("Sale completed. Receipt " + finalSale.receiptNumber + ".");
+      if (settledTable) { showSection("tables"); }
     });
   }
 

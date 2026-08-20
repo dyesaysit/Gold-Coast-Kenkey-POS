@@ -75,7 +75,9 @@ var COLLECTIONS = [
   { name: "inventoryProducts", key: "gckpos.inventoryProducts" },
   { name: "cashiers", key: "gckpos.cashiers" },
   { name: "sales", key: "gckpos.sales" },
-  { name: "settings", key: "gckpos.settings" }
+  { name: "settings", key: "gckpos.settings" },
+  { name: "tables", key: "gckpos.tables" },
+  { name: "tableOrders", key: "gckpos.tableOrders" }
 ];
 var KEYS = {};
 COLLECTIONS.forEach(function (c) { KEYS[c.name] = c.key; });
@@ -140,7 +142,7 @@ var SCHEMA = [
     "cashier_id TEXT REFERENCES cashiers(id), cashier_name TEXT, " +
     "subtotal REAL, discount REAL, total REAL, " +
     "payment_method TEXT, payment_amount_paid REAL, payment_change REAL, payment_reference TEXT, " +
-    "status TEXT, receipt_settings TEXT)",
+    "status TEXT, receipt_settings TEXT, table_id TEXT REFERENCES tables(id), table_name TEXT)",
 
   "CREATE TABLE IF NOT EXISTS sale_items (" +
     "seq INTEGER PRIMARY KEY AUTOINCREMENT, sale_id TEXT REFERENCES sales(id), " +
@@ -148,6 +150,11 @@ var SCHEMA = [
     "unit_price REAL, line_total REAL, track_inventory INTEGER, details TEXT)",
 
   "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)",
+
+  // Dine-in: tables (config) and their open running tabs (one row per seated
+  // table; the tab items live in doc, a nested snapshot like sale_items).
+  "CREATE TABLE IF NOT EXISTS tables (id TEXT PRIMARY KEY, name TEXT NOT NULL, active INTEGER)",
+  "CREATE TABLE IF NOT EXISTS table_orders (table_id TEXT PRIMARY KEY, doc TEXT NOT NULL)",
 
   "CREATE INDEX IF NOT EXISTS idx_sales_receipt ON sales(receipt_number)",
   "CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at)",
@@ -189,11 +196,19 @@ function open(filePath) {
     cashiersInfo.some(function (c) { return c.name === "pin"; });
   if (isOldSchema) {
     ["categories", "menu_items", "portions", "proteins", "extras", "inventory_products",
-     "cashiers", "sales", "settings", "menu_item_extras", "portion_proteins", "sale_items"]
+     "cashiers", "sales", "settings", "menu_item_extras", "portion_proteins", "sale_items",
+     "tables", "table_orders"]
       .forEach(function (t) { db.exec("DROP TABLE IF EXISTS " + t); });
   }
 
   SCHEMA.forEach(function (sql) { db.exec(sql); });
+
+  // Additive migration: older sales tables lack the dine-in table columns.
+  var salesCols = db.prepare("PRAGMA table_info(sales)").all().map(function (c) { return c.name; });
+  if (salesCols.indexOf("table_id") === -1) {
+    db.exec("ALTER TABLE sales ADD COLUMN table_id TEXT");
+    db.exec("ALTER TABLE sales ADD COLUMN table_name TEXT");
+  }
 
   function transaction(work) {
     db.exec("BEGIN");
@@ -301,6 +316,17 @@ function open(filePath) {
     return out;
   }
 
+  function readTables() {
+    return db.prepare("SELECT * FROM tables ORDER BY rowid").all().map(function (r) {
+      return { id: r.id, name: r.name, active: toBool(r.active) };
+    });
+  }
+
+  function readTableOrders() {
+    return db.prepare("SELECT doc FROM table_orders ORDER BY rowid").all()
+      .map(function (r) { return JSON.parse(r.doc); });
+  }
+
   function readSaleItems(saleId) {
     return db.prepare("SELECT details FROM sale_items WHERE sale_id = ? ORDER BY seq").all(saleId)
       .map(function (r) { return JSON.parse(r.details); });
@@ -324,6 +350,7 @@ function open(filePath) {
     }
     if (r.receipt_settings !== null) { sale.receiptSettings = JSON.parse(r.receipt_settings); }
     if (r.status !== null) { sale.status = r.status; }
+    if (r.table_id !== null || r.table_name !== null) { sale.table = { id: r.table_id, name: r.table_name }; }
     return sale;
   }
 
@@ -402,11 +429,22 @@ function open(filePath) {
     var ins = db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)");
     Object.keys(obj).forEach(function (key) { ins.run(key, JSON.stringify(obj[key])); });
   }
+  function fillTables(items) {
+    db.exec("DELETE FROM tables");
+    var ins = db.prepare("INSERT INTO tables (id, name, active) VALUES (?, ?, ?)");
+    (items || []).forEach(function (t) { ins.run(t.id, t.name, to01(t.active)); });
+  }
+  function fillTableOrders(items) {
+    db.exec("DELETE FROM table_orders");
+    var ins = db.prepare("INSERT OR REPLACE INTO table_orders (table_id, doc) VALUES (?, ?)");
+    (items || []).forEach(function (o) { ins.run(o.tableId, JSON.stringify(o)); });
+  }
 
   function insertSaleRow(sale) {
     var cashier = sale.cashier || null;
     var payment = sale.payment || null;
-    db.prepare("INSERT INTO sales (id, receipt_number, created_at, cashier_id, cashier_name, subtotal, discount, total, payment_method, payment_amount_paid, payment_change, payment_reference, status, receipt_settings) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    var table = sale.table || null;
+    db.prepare("INSERT INTO sales (id, receipt_number, created_at, cashier_id, cashier_name, subtotal, discount, total, payment_method, payment_amount_paid, payment_change, payment_reference, status, receipt_settings, table_id, table_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
       .run(
         orNull(sale.id), orNull(sale.receiptNumber), orNull(sale.createdAt),
         cashier ? orNull(cashier.id) : null, cashier ? orNull(cashier.name) : null,
@@ -414,7 +452,8 @@ function open(filePath) {
         payment ? orNull(payment.method) : null, payment ? orNull(payment.amountPaid) : null,
         payment ? orNull(payment.change) : null, payment ? optField(payment, "reference") : null,
         optField(sale, "status"),
-        has(sale, "receiptSettings") && sale.receiptSettings ? JSON.stringify(sale.receiptSettings) : null
+        has(sale, "receiptSettings") && sale.receiptSettings ? JSON.stringify(sale.receiptSettings) : null,
+        table ? orNull(table.id) : null, table ? orNull(table.name) : null
       );
     var insItem = db.prepare("INSERT INTO sale_items (sale_id, product_id, product_name, item_type, quantity, unit_price, line_total, track_inventory, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     (sale.items || []).forEach(function (item) {
@@ -443,6 +482,8 @@ function open(filePath) {
       case "cashiers": return readCashiers();
       case "sales": return readSales();
       case "settings": return readSettings();
+      case "tables": return readTables();
+      case "tableOrders": return readTableOrders();
       default: return null;
     }
   }
@@ -489,6 +530,8 @@ function open(filePath) {
       case "extras": fillExtras(value); break;
       case "inventoryProducts": fillInventoryProducts(value); break;
       case "cashiers": fillCashiers(value); break;
+      case "tables": fillTables(value); break;
+      case "tableOrders": fillTableOrders(value); break;
       case "sales": fillSales(value); break;
       case "settings": writeSettings(value); break;
       default: throw new Error("Unknown collection: " + name);
@@ -572,6 +615,8 @@ function open(filePath) {
     // Include the PIN hashes in a backup so a restore keeps logins working
     // (bootstrap never exposes them).
     data[KEYS.cashiers] = readCashiers(true);
+    // Open tabs are transient (like the cart); tables config is kept.
+    delete data[KEYS.tableOrders];
     return {
       backupFormat: BACKUP_FORMAT_NAME,
       backupFormatVersion: BACKUP_FORMAT_VERSION,
@@ -616,6 +661,9 @@ function open(filePath) {
         fillInventoryProducts(backup.data[KEYS.inventoryProducts]);
         fillSales(backup.data[KEYS.sales]);
         writeSettings(backup.data[KEYS.settings]);
+        // Tables (optional in older backups); clear any open tabs.
+        fillTables(Array.isArray(backup.data[KEYS.tables]) ? backup.data[KEYS.tables] : []);
+        fillTableOrders([]);
         return true;
       });
       return { ok: true };

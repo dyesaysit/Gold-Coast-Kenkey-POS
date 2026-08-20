@@ -55,6 +55,18 @@
           <span class="field__label">Address (optional)</span>
           <input class="field__input" id="setup-address" type="text" autocomplete="off" />
         </label>
+        <label class="field">
+          <span class="field__label">Service type</span>
+          <select class="field__input" id="setup-service-mode">
+            <option value="takeaway">Takeaway / counter (no tables)</option>
+            <option value="dinein">Dine-in (tables &amp; running tabs)</option>
+          </select>
+          <span class="field__note">Dine-in adds tables you can open a running bill on. You can change this later in Settings.</span>
+        </label>
+        <label class="field" id="setup-tables-field" hidden>
+          <span class="field__label">Number of tables</span>
+          <input class="field__input" id="setup-table-count" type="number" inputmode="numeric" min="1" max="200" value="8" />
+        </label>
         <div class="field">
           <span class="field__label">Logo (optional)</span>
           <div class="image-picker">
@@ -154,6 +166,11 @@
 
       <!-- Cart -->
       <aside class="cart" id="cart" aria-label="Cart">
+        <!-- Dine-in only: shows which table this bill belongs to. -->
+        <div class="cart-table-banner" id="cart-table-banner" hidden>
+          <span id="cart-table-name">Table</span>
+          <button class="btn btn--secondary cart-table-banner__back" id="cart-table-back" type="button">← Tables</button>
+        </div>
         <h2 class="cart__title">Cart <span class="cart__count" id="cart-count" aria-live="polite">0</span></h2>
         <ul class="cart__items" id="cart-items">
           <!-- Cart lines are rendered by app.js -->
@@ -194,6 +211,16 @@
         </button>
       </div>
     </main>
+
+    <!-- Dine-in: tables grid. Shown only in dine-in mode. Tap a table to open
+         its running tab and go to the POS screen. -->
+    <section class="tables-view" id="tables-view" hidden aria-label="Tables">
+      <div class="tables-view__head">
+        <h2 class="section-title">Tables</h2>
+        <p class="tables-view__hint">Tap a table to open its bill. Free tables are grey; open tables show a running total.</p>
+      </div>
+      <div class="tables-grid" id="tables-grid"></div>
+    </section>
 
     <!-- Product & inventory management (Supervisor/Admin). Hidden by default;
          shown when the Products or Inventory section is selected. -->
@@ -286,6 +313,20 @@
         <p class="modal__error settings-form__wide" id="settings-error" role="alert"></p>
         <div class="settings-form__wide"><button class="btn btn--primary" id="settings-save" type="submit">Save settings</button></div>
       </form>
+      <section class="settings-backup" aria-labelledby="tables-settings-title">
+        <div>
+          <h3 class="settings-backup__title" id="tables-settings-title">Dine-in tables</h3>
+          <p class="manage__hint">Turn dine-in on to serve tables with running bills. Off = takeaway/counter only.</p>
+        </div>
+        <label class="settings-tables__toggle">
+          <input type="checkbox" id="sf-dinein-enabled" />
+          <span>Enable dine-in tables</span>
+        </label>
+        <div class="settings-backup__actions" id="sf-tables-actions" hidden>
+          <button class="btn btn--secondary" id="tables-manage" type="button">Manage tables</button>
+          <span class="field__note" id="sf-tables-count"></span>
+        </div>
+      </section>
       <section class="settings-backup" aria-labelledby="backup-title">
         <div>
           <h3 class="settings-backup__title" id="backup-title">Backup &amp; Restore</h3>
@@ -601,6 +642,30 @@
         <div class="modal__actions">
           <button class="btn btn--secondary" id="category-cancel" type="button">Cancel</button>
           <button class="btn btn--primary" id="category-save" type="button">Save categories</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Tables editor modal (Admin). Add / rename / remove dine-in tables. -->
+  <div class="modal" id="tables-modal" hidden role="dialog" aria-modal="true"
+       aria-labelledby="tables-modal-title">
+    <div class="modal__overlay" id="tables-overlay"></div>
+    <div class="modal__panel" role="document">
+      <header class="modal__header">
+        <h2 class="modal__title" id="tables-modal-title">Tables</h2>
+        <button class="modal__close" id="tables-close" type="button" aria-label="Close">&#10005;</button>
+      </header>
+      <div class="modal__body">
+        <p class="field__note">Name your tables. A table with an open bill cannot be removed — settle it first.</p>
+        <div class="cat-editor" id="tables-editor-list"></div>
+        <button class="btn btn--secondary" id="tables-add" type="button">+ Add table</button>
+        <p class="modal__error" id="tables-error" role="alert"></p>
+      </div>
+      <footer class="modal__footer">
+        <div class="modal__actions">
+          <button class="btn btn--secondary" id="tables-cancel" type="button">Cancel</button>
+          <button class="btn btn--primary" id="tables-save" type="button">Save tables</button>
         </div>
       </footer>
     </div>
