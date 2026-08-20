@@ -711,7 +711,8 @@
     return keys.length ? keys[0] : "pos";
   }
 
-  // Nav keys a user can see, hiding "tables" unless the business is dine-in.
+  // Nav keys a user can see. "Tables" only shows in dine-in. POS shows in both
+  // modes — in dine-in it doubles as the over-the-counter / takeaway sale.
   function navKeysFor(user) {
     var nav = user ? auth.getAccessibleNav(user.role) : [];
     return nav.map(function (item) { return item.key; }).filter(function (key) {
@@ -727,11 +728,6 @@
     if (!currentUser || !auth.canAccess(currentUser.role, key)) {
       showToast("You do not have access to that section.");
       key = isDineIn() ? "tables" : "pos";
-    }
-    // Dine-in: you cannot open the POS grid without a table selected — it always
-    // belongs to a table's tab. Send them to pick a table first.
-    if (key === "pos" && isDineIn() && !state.activeTableId) {
-      key = "tables";
     }
     activeNavKey = key;
     var isPos = (key === "pos");
@@ -820,6 +816,15 @@
     state.cart = [];
     renderCart();
     showSection("tables");
+  }
+
+  // POS as an over-the-counter / takeaway sale: no table, the per-device cart.
+  function openCounterSale() {
+    state.activeTableId = null;
+    state.cart = storage.getCurrentCart();
+    showSection("pos");
+    renderProducts();
+    renderCart();
   }
 
   function startTablesPoll() {
@@ -1082,8 +1087,12 @@
   }
 
   function handleNavClick(item) {
+    if (item.key === "tables") {
+      backToTables(); // show the tables list (clears any open table)
+      return;
+    }
     if (item.key === "pos") {
-      showSection("pos");
+      openCounterSale(); // POS = over-the-counter/takeaway sale (no table)
       return;
     }
     if (item.key === "products" || item.key === "inventory" || item.key === "users" || item.key === "settings" || item.key === "reports" || item.key === "sales-history") {
