@@ -787,14 +787,18 @@
       var card = document.createElement("button");
       card.type = "button";
       card.className = "table-card" + (occupied ? " table-card--open" : "");
+      // The inner "top" is the table surface; CSS draws chairs around it.
+      var top = document.createElement("span");
+      top.className = "table-card__top";
       var name = document.createElement("span");
       name.className = "table-card__name";
       name.textContent = table.name;
       var status = document.createElement("span");
       status.className = "table-card__status";
       status.textContent = occupied ? money.formatMoney(cartTotalOf(order.items)) : "Free";
-      card.appendChild(name);
-      card.appendChild(status);
+      top.appendChild(name);
+      top.appendChild(status);
+      card.appendChild(top);
       card.addEventListener("click", function () { openTable(table.id); });
       elements.tablesGrid.appendChild(card);
     });
